@@ -1,0 +1,29 @@
+{
+  "name": "slot-pixijs",
+  "private": true,
+  "version": "0.0.0",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc && vite build",
+    "preview": "vite preview",
+    "test": "tsc ./src/slot/newEngine.ts",
+    "build:atlas": "texture-packer assets/raw --sheet assets/build/atlas.png --data assets/build/atlas.json --format json --trim-mode None",
+    "build:ktx2": "toktx --bcmp --t2 --genmipmap assets/build/atlas.ktx2 assets/build/atlas.png",
+    "build:manifest": "node tools/genManifest.js",
+    "build:assets": "npm run build:atlas && npm run build:ktx2 && npm run build:manifest"
+  },
+  "devDependencies": {
+    "@types/howler": "^2.2.12",
+    "typescript": "~5.8.3",
+    "vite": "^7.0.4"
+  },
+  "dependencies": {
+    "@pixi/basis": "^7.4.3",
+    "@pixi/filter-drop-shadow": "^5.2.0",
+    "gsap": "^3.13.0",
+    "howler": "^2.2.4",
+    "pixi.js": "^8.11.0",
+    "stats.js": "^0.17.0"
+  }
+}

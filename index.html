@@ -1,0 +1,153 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <link rel="manifest" href="/manifest.webmanifest">
+  <meta name="apple-mobile-web-app-title" content="Lair of Riches">
+  <link rel="apple-touch-icon" href="/assets/logo.png">
+  <title>Lair of Riches</title>
+	<style>
+		* { -webkit-tap-highlight-color: transparent; }
+		html, body {
+			margin: 0;
+			padding: 0;
+			width: 100%;
+			height: 100%;
+			min-height: 100%;
+			background: #000;
+			overflow: hidden;
+			user-select: none;
+			-webkit-user-select: none;
+			-ms-user-select: none;
+			-webkit-touch-callout: none;
+			touch-action: none;
+		}
+
+		#app-container {
+			position: fixed;
+			inset: 0;
+			width: 100vw;
+
+			height: 100vh;
+			height: -webkit-fill-available;
+			height: 100dvh;
+
+			height: calc(var(--vvh, 1vh) * 100);
+			padding-bottom: env(safe-area-inset-bottom);
+			box-sizing: border-box;
+			display: flex;
+			justify-content: center;
+			align-items: center;
+			background: #000;
+			user-select: none;
+			-webkit-user-select: none;
+			-ms-user-select: none;
+			-webkit-touch-callout: none;
+			touch-action: none;
+		}
+		#app {
+			position: relative;
+			background: #000;
+		}
+		#app canvas {
+			display: block;
+			user-select: none !important;
+			-webkit-user-select: none !important;
+			-ms-user-select: none !important;
+			-webkit-touch-callout: none !important;
+			touch-action: none !important;
+		}
+	</style>
+  <script>
+  (function () {
+	  try {
+		const isTop = window.top === window;
+		const hasNoEmbedFlag = !/[?&#]embed=1\b/.test(window.location.search + window.location.hash);
+
+		const disableFullscreen = /[?&#]nofullscreen=1\b/.test(window.location.search + window.location.hash);
+
+		const isTouch = ('ontouchstart' in window) || (navigator.maxTouchPoints || 0) > 0;
+		const isMobileUA = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent || '');
+		const isSmallScreen = Math.min(window.innerWidth, window.innerHeight) < 768;
+		const isMobile = isTouch && (isMobileUA || isSmallScreen);
+
+				const setVVH = () => {
+					try {
+						const vv = window.visualViewport;
+						const unit = vv ? (vv.height / 100) : (window.innerHeight / 100);
+						document.documentElement.style.setProperty('--vvh', unit + 'px');
+					} catch {}
+				};
+				setVVH();
+				window.addEventListener('resize', setVVH);
+				if (window.visualViewport) {
+					window.visualViewport.addEventListener('resize', setVVH);
+					window.visualViewport.addEventListener('scroll', setVVH);
+				}
+
+		if (isTop && hasNoEmbedFlag && !disableFullscreen && isMobile) {
+		  const requestFS = () => {
+
+			if (navigator.userActivation && !navigator.userActivation.isActive) {
+				console.debug('No user activation - skipping fullscreen request');
+				return;
+			}
+			
+		
+			if (!document.hasFocus()) {
+				console.debug('Document not focused - skipping fullscreen request');
+				return;
+			}
+			
+			const target = document.getElementById('app-container') || document.documentElement;
+			const rfs = target.requestFullscreen || target.webkitRequestFullscreen || target.mozRequestFullScreen || target.msRequestFullscreen;
+			if (rfs) {
+			  try { 
+				const promise = rfs.call(target);
+				if (promise && typeof promise.catch === 'function') {
+					promise.catch(e => {
+		
+						console.debug('Fullscreen request failed (expected):', e.message);
+					});
+				}
+			  } catch (e) { 
+		
+				console.debug('Fullscreen request failed (expected):', e.message);
+			  }
+			}
+		
+			document.removeEventListener('pointerdown', requestFS, true);
+			document.removeEventListener('touchstart', requestFS, true);
+			document.removeEventListener('keydown', requestFS, true);
+	  		document.removeEventListener('click', requestFS, true);
+		  };
+		
+		  document.addEventListener('pointerdown', requestFS, { capture: true, passive: true, once: true });
+		  document.addEventListener('touchstart', requestFS, { capture: true, passive: true, once: true });
+		  document.addEventListener('keydown', requestFS, { capture: true, once: true });
+	  	  document.addEventListener('click', requestFS, { capture: true, passive: true, once: true });
+		}
+		const prevent = (e) => { e.preventDefault(); };
+		document.addEventListener('contextmenu', prevent, { capture: true });
+		document.addEventListener('selectstart', prevent, { capture: true });
+		document.addEventListener('gesturestart', prevent, { capture: true });
+		document.addEventListener('gesturechange', prevent, { capture: true });
+		document.addEventListener('gestureend', prevent, { capture: true });
+	  } catch (e) { /* no-op */ }
+	})();
+  </script>
+  <script  type="module" src="./src/newMain.ts"></script>
+
+</head>
+<body>
+
+<div id="app-container">
+	<div id="app"></div>
+</div>
+
+</body>
+</html>

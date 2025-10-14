@@ -1,0 +1,17 @@
+{
+  "smart": true,
+  "textureName": "backgrounds",
+  "width": 4096,
+  "height": 4096,
+  "fixedSize": false,
+  "padding": 2,
+  "extrude": 1,
+  "allowRotation": false,
+  "allowTrim": false,
+  "trimMode": "None",
+  "removeFileExtension": true,
+  "prependFolderName": false,
+  "exporter": "Pixi",
+  "removeTransparentBorder": false,
+  "prependFolderName": false
+}

@@ -1,0 +1,34 @@
+{
+  "name": "backend",
+  "version": "1.0.0",
+  "main": "./dist/server.js",
+  "scripts": {
+    "dev": "tsc && npm run start",
+    "build": "tsc",
+    "build:lambda": "esbuild src/lambda.ts --bundle --platform=node --target=node18 --external:aws-sdk --outfile=dist/lambda.js",
+    "package:lambda": "npm run build:lambda && cd dist && zip -r lambda.zip lambda.js",
+    "clean": "rm -rf dist",
+    "start": "node ./out/src/server.js",
+    "killserver": "kill -9 $(lsof -ti:3001)",
+    "re": "npm run killserver && npm run start"
+  },
+  "dependencies": {
+    "@vendia/serverless-express": "^4.12.6",
+    "aws-lambda": "^1.0.7",
+    "cors": "^2.8.5",
+    "express": "^4.18.2",
+    "serverless-http": "^4.0.0"
+  },
+  "devDependencies": {
+    "@types/aws-lambda": "^8.10.152",
+    "@types/cors": "^2.8.13",
+    "@types/express": "^4.17.17",
+    "@types/node": "^20.19.9",
+    "esbuild": "^0.25.9",
+    "ts-node": "^10.9.1",
+    "typescript": "^5.0.0"
+  },
+  "author": "",
+  "license": "ISC",
+  "description": ""
+}

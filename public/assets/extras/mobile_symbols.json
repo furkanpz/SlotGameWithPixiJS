@@ -1,0 +1,159 @@
+{
+  "frames": {
+    "gamelogo.png": {
+      "frame": {
+        "x": 5,
+        "y": 5,
+        "w": 640,
+        "h": 200
+      },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 640,
+        "h": 200
+      },
+      "sourceSize": {
+        "w": 640,
+        "h": 200
+      },
+      "pivot": {
+        "x": 0.5,
+        "y": 0.5
+      }
+    },
+    "infosymbol1.png": {
+      "frame": {
+        "x": 655,
+        "y": 5,
+        "w": 400,
+        "h": 400
+      },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 400,
+        "h": 400
+      },
+      "sourceSize": {
+        "w": 400,
+        "h": 400
+      },
+      "pivot": {
+        "x": 0.5,
+        "y": 0.5
+      }
+    },
+    "logo.png": {
+      "frame": {
+        "x": 5,
+        "y": 215,
+        "w": 640,
+        "h": 200
+      },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 640,
+        "h": 200
+      },
+      "sourceSize": {
+        "w": 640,
+        "h": 200
+      },
+      "pivot": {
+        "x": 0.5,
+        "y": 0.5
+      }
+    },
+    "infosymbol0.png": {
+      "frame": {
+        "x": 5,
+        "y": 425,
+        "w": 635,
+        "h": 635
+      },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 635,
+        "h": 635
+      },
+      "sourceSize": {
+        "w": 635,
+        "h": 635
+      },
+      "pivot": {
+        "x": 0.5,
+        "y": 0.5
+      }
+    },
+    "max.png": {
+      "frame": {
+        "x": 655,
+        "y": 415,
+        "w": 400,
+        "h": 400
+      },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 400,
+        "h": 400
+      },
+      "sourceSize": {
+        "w": 400,
+        "h": 400
+      },
+      "pivot": {
+        "x": 0.5,
+        "y": 0.5
+      }
+    },
+    "spnbtn.png": {
+      "frame": {
+        "x": 650,
+        "y": 825,
+        "w": 400,
+        "h": 400
+      },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 400,
+        "h": 400
+      },
+      "sourceSize": {
+        "w": 400,
+        "h": 400
+      },
+      "pivot": {
+        "x": 0.5,
+        "y": 0.5
+      }
+    }
+  },
+  "meta": {
+    "app": "http://free-tex-packer.com",
+    "version": "0.6.7",
+    "image": "mobile_symbols.png",
+    "format": "RGBA8888",
+    "size": {
+      "w": 1060,
+      "h": 1230
+    },
+    "scale": 1
+  }
+}

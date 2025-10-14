@@ -1,0 +1,64 @@
+{
+  "desktop": {
+    "background": {
+      "video": "assets/background.mp4",
+      "bonusVideo": "assets/b_background.mp4"
+    },
+    "symbols": {
+      "atlas": "assets/symbols/symbols.json"
+    },
+    "frame": {
+      "texture": "assets/frame.png",
+      "inner": "assets/frame_2.jpg"
+    },
+    "start": {
+      "logo": {
+        "asset": "assets/gamelogo.png",
+        "x": 960,
+        "y": 300,
+        "anchorX": 0.5,
+        "anchorY": 1,
+        "scale": 1.0
+      }
+    },
+    "ui": {
+      "spinButton": {
+        "x": 1680,
+        "y": 880,
+        "width": 200,
+        "height": 200
+      }
+    }
+  },
+  "mobile": {
+    "background": {
+      "video": "assets/mobile_background.mp4",
+      "bonusVideo": "assets/mobile_b_background.mp4"
+    },
+    "symbols": {
+      "atlas": "assets/mobile_symbols/mobile_symbols.json"
+    },
+    "frame": {
+      "texture": "assets/mobile_frame.png",
+      "inner": "assets/frame_2.jpg"
+    },
+    "start": {
+      "logo": {
+        "asset": "assets/gamelogo.png",
+        "x": 540,
+        "y": 400,
+        "anchorX": 0.5,
+        "anchorY": 1,
+        "scale": 1.4
+      }
+    },
+    "ui": {
+      "spinButton": {
+        "x": 900,
+        "y": 1600,
+        "width": 220,
+        "height": 220
+      }
+    }
+  }
+}
