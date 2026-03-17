@@ -19,7 +19,7 @@ export class SpritePool {
         }
         if (sprite && !(sprite as any).destroyed) {
             this.reusedCount++;
-            try { (sprite as any).removeAllListeners && (sprite as any).removeAllListeners(); } catch {}
+            try { (sprite as any).removeAllListeners?.(); } catch {}
         } else {
             sprite = new Sprite(this.textures[symbolId]);
             this.createdCount++;
@@ -40,8 +40,8 @@ export class SpritePool {
         try { (sprite as any).buttonMode = false; } catch {}
         try { (sprite as any).hitArea = null; } catch {}
         try { (sprite as any).cursor = ''; } catch {}
-        try { sprite.anchor && sprite.anchor.set && sprite.anchor.set(0.5); } catch {}
-        try { (sprite as any).cacheAsTexture && (sprite as any).cacheAsTexture(false); } catch {}
+        try { sprite.anchor?.set(0.5); } catch {}
+        try { (sprite as any).cacheAsTexture?.(false); } catch {}
         return sprite;
     }
 
@@ -69,8 +69,8 @@ export class SpritePool {
                 sprite.width = texture.width;
                 sprite.height = texture.height;
             }
-            try { sprite.anchor && sprite.anchor.set && sprite.anchor.set(0, 0); } catch (e) {}
-            try { (sprite as any).removeAllListeners && (sprite as any).removeAllListeners(); } catch (e) {}
+            try { sprite.anchor?.set(0, 0); } catch {}
+            try { (sprite as any).removeAllListeners?.(); } catch {}
             try { sprite.interactive = false; } catch (e) {}
             try { (sprite as any).eventMode = 'none'; } catch (e) {}
             try { (sprite as any).buttonMode = false; } catch (e) {}
@@ -79,7 +79,7 @@ export class SpritePool {
             try { sprite.alpha = 1; } catch (e) {}
             try { (sprite as any).tint = 0xFFFFFF; } catch (e) {}
             try { sprite.filters = null; } catch (e) {}
-            try { (sprite as any).cacheAsTexture && (sprite as any).cacheAsTexture(false); } catch (e) {}
+            try { (sprite as any).cacheAsTexture?.(false); } catch {}
         } catch (e) {}
         return sprite;
     }
@@ -93,7 +93,7 @@ export class SpritePool {
             sprite.visible = false;
             if (this.pool.indexOf(sprite) !== -1) return;
             if (this.pool.length < this.maxPool) {
-                try { (sprite as any).removeAllListeners && (sprite as any).removeAllListeners(); } catch (e) {}
+                try { (sprite as any).removeAllListeners?.(); } catch {}
                 try { sprite.interactive = false; } catch (e) {}
                 try { (sprite as any).eventMode = 'none'; } catch (e) {}
                 try { (sprite as any).buttonMode = false; } catch (e) {}
@@ -102,7 +102,7 @@ export class SpritePool {
                 try { sprite.alpha = 1; } catch (e) {}
                 try { (sprite as any).tint = 0xFFFFFF; } catch (e) {}
                 try { sprite.filters = null; } catch (e) {}
-                try { (sprite as any).cacheAsTexture && (sprite as any).cacheAsTexture(false); } catch (e) {}
+                try { (sprite as any).cacheAsTexture?.(false); } catch {}
                 try { this.pool.push(sprite); } catch (e) {}
             } else {
                 try { sprite.destroy(); } catch (e) {}
@@ -110,25 +110,6 @@ export class SpritePool {
         } catch (e) {
             try { sprite.destroy(); } catch (e) {}
         }
-    }
-    public getPoolSize(): number {
-        return this.pool.length;
-    }
-
-    public getCreatedCount(): number {
-        return this.createdCount;
-    }
-
-    public getReusedCount(): number {
-        return this.reusedCount;
-    }
-    public getActiveCount(): number {
-        return Math.max(0, this.createdCount - this.getPoolSize());
-    }
-    public debugLog(prefix = ''): void {
-        try {
-            console.log(`${prefix} SpritePool created=${this.createdCount} reused=${this.reusedCount} pool=${this.getPoolSize()} active=${this.getActiveCount()}`);
-        } catch (e) {}
     }
 }
 
@@ -169,7 +150,7 @@ export class ObjectPool {
 			t = new Text({text: '', style: this.defaultTextStyle.clone()}); 
             this.textCreated++;
         }
-    try { (t as any).removeAllListeners && (t as any).removeAllListeners(); } catch (e) {}
+    try { (t as any).removeAllListeners?.(); } catch {}
     this.resetText(t);
         t.visible = true;
         return t;
@@ -182,7 +163,7 @@ export class ObjectPool {
                 try { t.parent.removeChild(t); } catch (e) {}
             }
             
-            try { (t as any).removeAllListeners && (t as any).removeAllListeners(); } catch (e) {}
+            try { (t as any).removeAllListeners?.(); } catch {}
             try { (t as any).buttonMode = false; } catch (e) {}
             try { (t as any).hitArea = null; } catch (e) {}
             this.resetText(t);
@@ -208,7 +189,7 @@ export class ObjectPool {
             g = new Graphics();
             this.graphicsCreated++;
         }
-    try { (g as any).removeAllListeners && (g as any).removeAllListeners(); } catch (e) {}
+    try { (g as any).removeAllListeners?.(); } catch {}
     this.resetGraphics(g);
         g.visible = true;
         return g;
@@ -221,11 +202,11 @@ export class ObjectPool {
                 try { g.parent.removeChild(g); } catch (e) {}
             }
             
-            try { (g as any).removeAllListeners && (g as any).removeAllListeners(); } catch (e) {}
+            try { (g as any).removeAllListeners?.(); } catch {}
             try { (g as any).buttonMode = false; } catch (e) {}
             try { (g as any).hitArea = null; } catch (e) {}
             
-            try { (g as any).removeChildren && (g as any).removeChildren(); } catch (e) {}
+            try { (g as any).removeChildren?.(); } catch {}
             this.resetGraphics(g);
             g.visible = false;
             if (this.graphicsPool.length < this.maxGraphicsPool && !(g as any).destroyed) {
@@ -249,7 +230,7 @@ export class ObjectPool {
             c = new Container();
             this.containerCreated++;
         }
-        try { (c as any).removeAllListeners && (c as any).removeAllListeners(); } catch (e) {}
+        try { (c as any).removeAllListeners?.(); } catch {}
     this.resetContainer(c);
         c.visible = true;
         return c;
@@ -263,7 +244,7 @@ export class ObjectPool {
             }
             
             try { c.removeChildren(); } catch (e) {}
-            try { (c as any).removeAllListeners && (c as any).removeAllListeners(); } catch (e) {}
+            try { (c as any).removeAllListeners?.(); } catch {}
             try { c.interactive = false; } catch (e) {}
             try { (c as any).buttonMode = false; } catch (e) {}
             try { (c as any).hitArea = null; } catch (e) {}
@@ -287,7 +268,7 @@ export class ObjectPool {
             t.rotation = 0;
             t.scale.set(1, 1);
             t.x = 0; t.y = 0;
-            t.anchor && (t.anchor.set && t.anchor.set(0.5, 0.5));
+            t.anchor?.set(0.5, 0.5);
             t.style = this.defaultTextStyle.clone();
             t.interactive = false;
             try { (t as any).eventMode = 'none'; } catch {}
@@ -311,7 +292,7 @@ export class ObjectPool {
             g.scale.set(1, 1);
             g.x = 0; g.y = 0;
             
-            try { (g as any).removeChildren && (g as any).removeChildren(); } catch {}
+            try { (g as any).removeChildren?.(); } catch {}
             
             try { (g as any).interactive = false; } catch {}
             try { (g as any).eventMode = 'none'; } catch {}
@@ -327,7 +308,7 @@ export class ObjectPool {
             try { (g as any).visible = true; } catch (e) {}
             try { (g as any).label = ''; } catch {}
             try {
-                if ((g as any).cacheAsTexture) (g as any).cacheAsTexture(false);
+                (g as any).cacheAsTexture?.(false);
             } catch {}
         } catch (e) {}
     }

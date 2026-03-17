@@ -73,9 +73,25 @@ export class GameAnimations {
 	
 	private get pool() { return (this._gamerenderer as any)?.objectPool ?? null; }
 	private acquireGraphics(): Graphics { return this.pool ? this.pool.acquireGraphics() : new Graphics(); }
-	private releaseGraphics(g: Graphics) { try { this.pool ? this.pool.releaseGraphics(g) : g.destroy(); } catch {} }
-	private acquireText(): Text { return this.pool ? this.pool.acquireText() : new Text({ text: '', style: new TextStyle() }); }
-	private releaseText(t: Text) { try { this.pool ? this.pool.releaseText(t) : t.destroy(); } catch {} }
+		private releaseGraphics(g: Graphics) {
+			try {
+				if (this.pool) {
+					this.pool.releaseGraphics(g);
+				} else {
+					g.destroy();
+				}
+			} catch {}
+		}
+		private acquireText(): Text { return this.pool ? this.pool.acquireText() : new Text({ text: '', style: new TextStyle() }); }
+		private releaseText(t: Text) {
+			try {
+				if (this.pool) {
+					this.pool.releaseText(t);
+				} else {
+					t.destroy();
+				}
+			} catch {}
+		}
 	private acquireContainer(): Container { return this.pool ? this.pool.acquireContainer() : new Container(); }
 
 	constructor(

@@ -11,6 +11,7 @@
     "verbatimModuleSyntax": true,
     "moduleDetection": "force",
     "noEmit": true,
+    "types": ["vite/client"],
 
     "strict": true,
     "noUnusedLocals": true,

@@ -900,13 +900,17 @@ export class gameInfo {
 			minusBtn.x = barX + barW * 0.60; plusBtn.x = barX + barW * 0.75;
 			minusBtn.y = plusBtn.y = barY + barH / 2;
 			overlayContainer.addChild(minusBtn, plusBtn);
-			const onChangeBet = (dir: -1 | 1) => {
-				if (this._client.isProcessingSpin) return;
-				dir < 0 ? this._client.DownBet() : this._client.UpBet();
-				this.updateBetDisplay();
-				betTxt.text = `${GameConstants.currency}${this._client.realAmount.toFixed(2).replace('.', ',')}`;
-				boxUpdaters.forEach(fn => { try { fn(); } catch {} });
-			};
+				const onChangeBet = (dir: -1 | 1) => {
+					if (this._client.isProcessingSpin) return;
+					if (dir < 0) {
+						this._client.DownBet();
+					} else {
+						this._client.UpBet();
+					}
+					this.updateBetDisplay();
+					betTxt.text = `${GameConstants.currency}${this._client.realAmount.toFixed(2).replace('.', ',')}`;
+					boxUpdaters.forEach(fn => { try { fn(); } catch {} });
+				};
 			minusBtn.on('pointerdown', (e: any) => { e.stopPropagation?.(); onChangeBet(-1); });
 			plusBtn.on('pointerdown', (e: any) => { e.stopPropagation?.(); onChangeBet(1); });
 			desktopBoxesYOffset = barY + barH + gapAfterBar;
@@ -952,9 +956,9 @@ export class gameInfo {
 				boxBg.on?.('pointerdown', (e: any) => { e.stopPropagation?.(); });
 			}
 
-			const titleText = acquireText();
-			titleText.text = title;
-			titleText.anchor && titleText.anchor.set && titleText.anchor.set(0.5);
+				const titleText = acquireText();
+				titleText.text = title;
+				titleText.anchor?.set(0.5);
 			(titleText.style as any).fontFamily = "Bebas Neue";
 			(titleText.style as any).fontSize = (scalePx(GameConstants.IS_MOBILE ? 50 : 35, this.screenWidth, this.screenHeight) as number) * titleScale as any;
 			(titleText.style as any).fill = GameConstants.COLORS.BLACK as any;
@@ -966,11 +970,10 @@ export class gameInfo {
 			
 			titleText.y = boxHeight / 7;
 
-			const descText = acquireText();
-			descText.text = desc;
-			descText.anchor && descText.anchor.set && descText.anchor.set(0.5);
-			(titleText.style as any);
-			(descText.style as any).fontFamily = "Arial";
+				const descText = acquireText();
+				descText.text = desc;
+				descText.anchor?.set(0.5);
+				(descText.style as any).fontFamily = "Arial";
 			(descText.style as any).fontSize = (scalePx(GameConstants.IS_MOBILE ? 22 : 16, this.screenWidth, this.screenHeight) as number) * descScale as any;
 			(descText.style as any).fill = GameConstants.COLORS.BLACK as any;
 			(descText.style as any).align = "center" as any;
@@ -999,9 +1002,9 @@ export class gameInfo {
 				image.y = descText.y + descText.height + scalePx(10, this.screenWidth, this.screenHeight);
 			}
 
-			const volatilityText = acquireText();
-			volatilityText.text = `Volatility: Very High`;
-			volatilityText.anchor && volatilityText.anchor.set && volatilityText.anchor.set(0.5);
+				const volatilityText = acquireText();
+				volatilityText.text = `Volatility: Very High`;
+				volatilityText.anchor?.set(0.5);
 			(volatilityText.style as any).fontFamily = "Arial";
 			(volatilityText.style as any).fontSize = scalePx(GameConstants.IS_MOBILE ? 30 : 16, this.screenWidth, this.screenHeight) as any;
 			(volatilityText.style as any).fill = GameConstants.COLORS.BLACK as any;
@@ -1017,10 +1020,10 @@ export class gameInfo {
 			
 			volatilityText.visible = true;
 
-			const amountText = acquireText();
-			const makeAmount = () => `${GameConstants.currency}${(this._client.realAmount * priceMultiplier).toFixed(2).replace(".", ",")}`;
-			amountText.text = makeAmount();
-			amountText.anchor && amountText.anchor.set && amountText.anchor.set(0.5);
+				const amountText = acquireText();
+				const makeAmount = () => `${GameConstants.currency}${(this._client.realAmount * priceMultiplier).toFixed(2).replace(".", ",")}`;
+				amountText.text = makeAmount();
+				amountText.anchor?.set(0.5);
 			(amountText.style as any).fontFamily = "Arial";
 			(amountText.style as any).fontSize = (scalePx(GameConstants.IS_MOBILE ? 40 : 28, this.screenWidth, this.screenHeight) as number) * amountScale as any;
 			(amountText.style as any).fill = GameConstants.COLORS.BLACK as any;
@@ -1087,9 +1090,9 @@ export class gameInfo {
 			(button as any).on('pointerupoutside', onBtnCancel);
 			(button as any).on('pointercancel', onBtnCancel);
 
-			const buttonTextObj = acquireText();
-			buttonTextObj.text = buttonText;
-			buttonTextObj.anchor && buttonTextObj.anchor.set && buttonTextObj.anchor.set(0.5);
+				const buttonTextObj = acquireText();
+				buttonTextObj.text = buttonText;
+				buttonTextObj.anchor?.set(0.5);
 			(buttonTextObj.style as any).fontFamily = "Bebas Neue";
 			(buttonTextObj.style as any).fontSize = (scalePx(GameConstants.IS_MOBILE ? 46 : 38, this.screenWidth, this.screenHeight) as number) * ctaTextScale as any;
 			(buttonTextObj.style as any).fill = GameConstants.COLORS.WHITE as any;
@@ -1256,13 +1259,17 @@ export class gameInfo {
 			minusBtn.x = Math.floor(barPad + barH * 0.6);
 			plusBtn.x = Math.floor(this.screenWidth - barPad - barH * 0.6);
 			minusBtn.y = plusBtn.y = Math.floor(barY + barH / 2);
-			const onChangeBet = (dir: -1 | 1) => {
-				try {
-					if (this._client.isProcessingSpin) return;
-					dir < 0 ? this._client.DownBet() : this._client.UpBet();
-					this.updateBetDisplay();
-					betTxt.text = `${GameConstants.currency}${this._client.realAmount.toFixed(2).replace('.', ',')}`;
-					boxUpdaters.forEach(fn => { try { fn(); } catch {} });
+				const onChangeBet = (dir: -1 | 1) => {
+					try {
+						if (this._client.isProcessingSpin) return;
+						if (dir < 0) {
+							this._client.DownBet();
+						} else {
+							this._client.UpBet();
+						}
+						this.updateBetDisplay();
+						betTxt.text = `${GameConstants.currency}${this._client.realAmount.toFixed(2).replace('.', ',')}`;
+						boxUpdaters.forEach(fn => { try { fn(); } catch {} });
 				} catch {}
 			};
 			minusBtn.on('pointerdown', (e: any) => { e.stopPropagation?.(); onChangeBet(-1); });
@@ -2099,7 +2106,7 @@ export class gameInfo {
 					this.releaseDisplayObjectDeep(child, pool);
 				}
 			}
-			try { (node as any).parent && (node as any).parent.removeChild(node as any); } catch {}
+				try { (node as any).parent?.removeChild(node as any); } catch {}
 			if (pool) {
 				if ((node as any).clear !== undefined && (node as any).isSprite !== true && (node as any)._texture === undefined) {
 					try { pool.releaseGraphics(node as any as Graphics); return; } catch {}
@@ -2121,7 +2128,7 @@ export class gameInfo {
 				}
 			}
 			
-			try { (node as any).destroy && (node as any).destroy({ children: false }); } catch {}
+				try { (node as any).destroy?.({ children: false }); } catch {}
 		} catch {}
 	}
 

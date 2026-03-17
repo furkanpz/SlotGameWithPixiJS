@@ -175,10 +175,7 @@ export class GameClient {
 			});
 			this.serverok = true;
 			this.serverProcessing = false;
-		} catch (error: any) {
-			if (error.name === "AbortError") {
-			} else {
-			}
+		} catch {
 			this.serverok = false;
 			this.serverProcessing = false;
 		} finally {

@@ -1,5 +1,5 @@
 import { SymbolId, Money } from "./types/types";
-import { MathModelConfig, LineWin, GroupedSymbol } from "./types/data.types";
+import { MathModelConfig, GroupedSymbol } from "./types/data.types";
 
 export class MathEngine {
   	constructor(private cfg: MathModelConfig) {}

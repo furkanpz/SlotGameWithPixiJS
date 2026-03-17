@@ -261,13 +261,8 @@ export class LairOfRiches {
 			}
 		}
 
-		let grid = this.buildGridFromStops(rs, stops);
-		const actualScatter = this.scatterCounter(grid);
-		if (actualScatter !== requiredScatter) {
-			
+			return this.buildGridFromStops(rs, stops);
 		}
-		return grid;
-	}
 	private bonusSpin(req: SpinRequest): BonusSpinResult
 	{
 		const rng: Rng = req.qaSeed ? new SeededRng(req.qaSeed) : new SystemRng();

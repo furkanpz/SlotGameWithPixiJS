@@ -130,10 +130,23 @@ npm run typecheck
 npm --prefix backend run typecheck
 ```
 
+Linting:
+
+```bash
+npm run lint
+```
+
 Clean generated output:
 
 ```bash
 npm run clean
+```
+
+Security verification:
+
+```bash
+npm audit --json
+npm --prefix backend audit --json
 ```
 
 ## Deployment Notes

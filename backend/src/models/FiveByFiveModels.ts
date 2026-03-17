@@ -57,8 +57,7 @@ function buildPaytableFromSymbols() : PaytableEntry[] {
   });
 }
 function buildPaylines(rowsVisible = 5): number[][] {
-  return LINES_Y.map((yArr, idx) => {
-    
+  return LINES_Y.map((yArr) => {
     return yArr.map((row, col) => col * rowsVisible + row);
   });
 }

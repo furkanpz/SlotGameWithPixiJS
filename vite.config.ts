@@ -29,7 +29,7 @@ export default defineConfig(({ mode }) => {
             if (id.includes("howler")) {
               return "vendor-howler";
             }
-            return "vendor";
+            return;
           },
         },
       },
@@ -40,7 +40,6 @@ export default defineConfig(({ mode }) => {
     },
     optimizeDeps: {
       exclude: ["pixi.js"],
-      include: ["eventemitter3", "parse-svg-path", "@xmldom/xmldom"],
       force: true,
       esbuildOptions: {
         target: "esnext",

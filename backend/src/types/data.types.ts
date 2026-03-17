@@ -1,4 +1,4 @@
-import { Money, SymbolDef, SymbolId, PaytableEntry, spinType } from "./types";
+import { Money, SymbolId, PaytableEntry, spinType } from "./types";
 
 export interface ReelStrip { id: string; symbols: SymbolId[]; weights?: number[] }
 export interface ReelSet { id: string; reels: ReelStrip[]; rowsVisible: number; ways?: boolean }

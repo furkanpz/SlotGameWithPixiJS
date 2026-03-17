@@ -24,11 +24,9 @@ export class SoundManager {
     public async initializeOnUserGesture(): Promise<void> {
         if (this.isInitialized) return;
         try {
-            
             const ctx = (Howler as any).ctx as AudioContext | undefined;
             if (ctx && ctx.state === "suspended") {
                 await ctx.resume();
-                console.log("AudioContext resumed successfully after user gesture");
             }
             this.isInitialized = true;
         } catch (error) {

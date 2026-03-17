@@ -8,26 +8,28 @@
     "dev:frontend": "vite --host 127.0.0.1",
     "dev:backend": "npm --prefix backend run dev",
     "dev:exhibition": "node ./scripts/dev-exhibition.mjs",
+    "lint": "eslint src backend/src scripts vite.config.ts eslint.config.mjs",
     "typecheck": "tsc --noEmit",
     "build": "tsc --noEmit && vite build",
     "build:backend": "npm --prefix backend run build",
     "build:all": "node ./scripts/smoke-check.mjs",
     "preview": "vite preview --host 127.0.0.1",
     "smoke": "node ./scripts/smoke-check.mjs",
-    "test": "npm run smoke",
+    "test": "npm run lint && npm run smoke",
     "clean": "node ./scripts/clean.mjs"
   },
   "devDependencies": {
+    "@eslint/js": "^9.34.0",
+    "@typescript-eslint/eslint-plugin": "^8.41.0",
+    "@typescript-eslint/parser": "^8.41.0",
     "@types/howler": "^2.2.12",
+    "eslint": "^9.34.0",
+    "globals": "^16.3.0",
     "typescript": "~5.8.3",
     "vite": "^7.0.4"
   },
   "dependencies": {
-    "@pixi/basis": "^7.4.3",
-    "@pixi/filter-drop-shadow": "^5.2.0",
-    "gsap": "^3.13.0",
     "howler": "^2.2.4",
-    "pixi.js": "^8.11.0",
-    "stats.js": "^0.17.0"
+    "pixi.js": "^8.11.0"
   }
 }
