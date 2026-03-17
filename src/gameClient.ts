@@ -401,4 +401,11 @@ export class GameClient {
 	public get serverProc(): boolean {
 		return (this.serverProcessing);
 	}
+
+	public dispose(): void {
+		this.balanceChangeCallback = undefined;
+		this.gameRenderer = null;
+		this.assetsLoader = null;
+		this.gameInfo = null;
+	}
 }

@@ -1,0 +1,17 @@
+.DS_Store
+node_modules/
+dist/
+coverage/
+.env
+.env.local
+.env.*.local
+backend/node_modules/
+backend/out/
+backend/dist/
+backend/.env
+backend/.env.local
+backend/.env.*.local
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*

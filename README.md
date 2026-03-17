@@ -1,16 +1,10 @@
-#  Lair of Riches — HTML5 Slot Game Prototype
+# Lair of Riches
 
-**Lair of Riches** is a 5x5 “Bonus Buy” slot game prototype developed with **PixiJS (HTML5)**.  
-The project replicates key features of modern slot games, including a configurable **RTP (Return to Player)**, an **Expanding Multiplier Wild** mechanic, and a fully **data-driven user interface flow**.
+Lair of Riches is a 5x5 PixiJS slot prototype prepared for a local exhibition setup. The repository contains the frontend game client, the local backend used by the demo math engine, and a local exhibition workflow that starts both services together.
 
-This prototype represents my **first full-scale game development project** — covering everything from designing game mechanics and balancing math models to implementing a responsive, performant front-end.  
-Although it began as a personal experiment, the ultimate goal was to meet **professional production standards** and create a **technically robust, visually complete** experience.
+**[Play the Demo](https://furkanpz.github.io/lairofriches/)**
 
- **[Play the Demo](https://furkanpz.github.io/lairofriches/)**
-
----
-
-##  Gameplay Showcase
+## Gameplay Showcase
 
 | Stage | Preview |
 |-------|----------|
@@ -21,74 +15,141 @@ Although it began as a personal experiment, the ultimate goal was to meet **prof
 | **Bonus Win Screen** | ![Bonus Win Screen](https://i.ibb.co/Y41vgtQd/game4.jpg) |
 | **Bonus Game Screen** | ![Bonus Game Screen](https://i.ibb.co/FZ6c054/game5.jpg) |
 
----
-
-##  Installation
-
-### Clone the Repository
-```bash
-git clone https://github.com/furkanpz/SlotGameWithPixiJS
-cd SlotGameWithPixiJS
-```
-
-### Frontend
-```bash
-cd src
-npm install
-npm run dev
-```
-
-### Backend
-```bash
-cd backend
-npm install
-npm run dev
-```
-
----
-
-##  Project Overview
+## Project Overview
 
 **Game Engine:** TypeScript + PixiJS  
-**Design:** Fully responsive, self-contained, and asset-light
+**Design:** Responsive, self-contained, and production-hardened for local exhibition use
 
-###  Core Features
+### Core Features
 
-#### • Expanding Multiplier “Wolf Wild”
-When a Wild symbol lands, it expands to fill the reel and applies a random multiplier between **2x and 200x**.
+- Expanding Multiplier Wolf Wild
+- Free Spins Bonus
+- Bonus Buy flow through the existing `SpinT` contract
+- Data-driven UI and paytable flow
+- Local exhibition workflow with frontend and backend startup scripts
 
-#### • Free Spins Bonus
-Triggered by **3 or more Scatter symbols**, the bonus round includes enhanced payout features.
-
-#### • Bonus Buy
-Players can directly purchase access to the **Free Spins** round for testing or high-volatility gameplay.
-
-#### • Data-Driven Architecture
-All statistics, paytables, and UI elements are dynamically rendered from a **centralized data model** — no hardcoded values.
-
-#### • Statistical Validation
-The game math model has been verified through a **500M-spin simulation**, ensuring accurate RTP and volatility outcomes.
-
-#### • Zero External Assets
-All symbols are **programmatically rendered on canvas**, eliminating external image dependencies for faster loading and portability.
-
----
-
-##  Mathematical Model
+## Mathematical Model
 
 | Metric | Value | Description |
 |--------|--------|-------------|
-| **Total RTP** | 96.92% | Theoretical long-term return percentage. |
-| **RTP Structure** | 70.38% (Base) / 26.55% (Bonus) | Most payouts originate from the base game. |
-| **Max Win** | 15,000x | Maximum win multiplier per spin. |
-| **Hit Frequency** | 27.69% | Probability of any winning combination. |
-| **Bonus Trigger** | ~1 in 305 spins (0.328%) | Average rate of Free Spins activation. |
-| **Volatility** | Very High | Infrequent wins with large potential payouts. |
+| **Total RTP** | 96.92% | Theoretical long-term return percentage |
+| **RTP Structure** | 70.38% (Base) / 26.55% (Bonus) | Most payouts originate from the base game |
+| **Max Win** | 15,000x | Maximum win multiplier per spin |
+| **Hit Frequency** | 27.69% | Probability of any winning combination |
+| **Bonus Trigger** | ~1 in 305 spins (0.328%) | Average rate of Free Spins activation |
+| **Volatility** | Very High | Infrequent wins with large potential payouts |
 
----
+## Requirements
 
-##  Acknowledgements
+- Node.js 20 LTS
+- npm 10 or newer
 
-Thank you for taking the time to explore **Lair of Riches**!  
-This project is open for feedback, discussion, and potential collaboration.  
-— **Furkan Uyar**
+## Project Structure
+
+- `src/`: PixiJS frontend
+- `backend/src/`: local demo backend
+- `public/`: production assets
+- `scripts/`: local workflow helpers
+- `docs/exhibition-prep-status.md`: current prep status and verification log
+
+## Environment
+
+Frontend variables:
+
+- `VITE_API_BASE_URL`: API base URL used by the frontend
+- `VITE_PUBLIC_BASE_PATH`: public base path for hosted builds
+
+Backend variables:
+
+- `PORT`: backend port
+- `CORS_ORIGIN`: allowed frontend origin, or a comma-separated allowlist
+- `PUBLIC_BASE_URL`: frontend URL returned by the provider endpoint
+
+Example files:
+
+- [`.env.example`](/Users/furkan/Desktop/Proje/SlotGameWithPixiJS/.env.example)
+- [`backend/.env.example`](/Users/furkan/Desktop/Proje/SlotGameWithPixiJS/backend/.env.example)
+
+## Installation
+
+```bash
+npm install
+npm --prefix backend install
+```
+
+## Local Exhibition Workflow
+
+Start the full local exhibition stack:
+
+```bash
+npm run dev:exhibition
+```
+
+This starts:
+
+- frontend on `http://127.0.0.1:5173`
+- backend on `http://localhost:3001/demo`
+
+Individual services:
+
+```bash
+npm run dev:frontend
+npm run dev:backend
+```
+
+## Build And Verification
+
+Frontend production build:
+
+```bash
+npm run build
+```
+
+Backend production build:
+
+```bash
+npm run build:backend
+```
+
+Full build verification:
+
+```bash
+npm run build:all
+```
+
+Smoke verification:
+
+```bash
+npm run smoke
+```
+
+Type checking:
+
+```bash
+npm run typecheck
+npm --prefix backend run typecheck
+```
+
+Clean generated output:
+
+```bash
+npm run clean
+```
+
+## Deployment Notes
+
+- Local exhibition is the default target.
+- Hosted builds should set `VITE_PUBLIC_BASE_PATH` and `VITE_API_BASE_URL` explicitly.
+- The frontend expects the backend under `/demo/api`.
+- Bonus buy remains part of the existing spin contract through `SpinT`; there is no separate `bonus-buy` endpoint.
+
+## Troubleshooting
+
+- If the frontend opens without responses, confirm the backend is reachable at `http://localhost:3001/demo/ping` and that `CORS_ORIGIN` includes the frontend origin.
+- If assets fail to load after a base-path change, verify `VITE_PUBLIC_BASE_PATH` matches the deployed public folder.
+- If audio does not start immediately, interact with the start screen once to unlock browser audio.
+- If a runtime failure overlay appears, use the retry action or restart the local exhibition stack.
+
+## Acknowledgements
+
+Thank you for taking the time to explore Lair of Riches. This project remains open for feedback, discussion, and collaboration.

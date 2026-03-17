@@ -6,9 +6,10 @@
   <meta name="mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-  <link rel="manifest" href="/manifest.webmanifest">
+  <link rel="manifest" href="%BASE_URL%manifest.webmanifest">
+  <link rel="icon" href="%BASE_URL%assets/logo.png">
   <meta name="apple-mobile-web-app-title" content="Lair of Riches">
-  <link rel="apple-touch-icon" href="/assets/logo.png">
+  <link rel="apple-touch-icon" href="%BASE_URL%assets/logo.png">
   <title>Lair of Riches</title>
 	<style>
 		* { -webkit-tap-highlight-color: transparent; }
@@ -62,92 +63,11 @@
 			touch-action: none !important;
 		}
 	</style>
-  <script>
-  (function () {
-	  try {
-		const isTop = window.top === window;
-		const hasNoEmbedFlag = !/[?&#]embed=1\b/.test(window.location.search + window.location.hash);
-
-		const disableFullscreen = /[?&#]nofullscreen=1\b/.test(window.location.search + window.location.hash);
-
-		const isTouch = ('ontouchstart' in window) || (navigator.maxTouchPoints || 0) > 0;
-		const isMobileUA = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent || '');
-		const isSmallScreen = Math.min(window.innerWidth, window.innerHeight) < 768;
-		const isMobile = isTouch && (isMobileUA || isSmallScreen);
-
-				const setVVH = () => {
-					try {
-						const vv = window.visualViewport;
-						const unit = vv ? (vv.height / 100) : (window.innerHeight / 100);
-						document.documentElement.style.setProperty('--vvh', unit + 'px');
-					} catch {}
-				};
-				setVVH();
-				window.addEventListener('resize', setVVH);
-				if (window.visualViewport) {
-					window.visualViewport.addEventListener('resize', setVVH);
-					window.visualViewport.addEventListener('scroll', setVVH);
-				}
-
-		if (isTop && hasNoEmbedFlag && !disableFullscreen && isMobile) {
-		  const requestFS = () => {
-
-			if (navigator.userActivation && !navigator.userActivation.isActive) {
-				console.debug('No user activation - skipping fullscreen request');
-				return;
-			}
-			
-		
-			if (!document.hasFocus()) {
-				console.debug('Document not focused - skipping fullscreen request');
-				return;
-			}
-			
-			const target = document.getElementById('app-container') || document.documentElement;
-			const rfs = target.requestFullscreen || target.webkitRequestFullscreen || target.mozRequestFullScreen || target.msRequestFullscreen;
-			if (rfs) {
-			  try { 
-				const promise = rfs.call(target);
-				if (promise && typeof promise.catch === 'function') {
-					promise.catch(e => {
-		
-						console.debug('Fullscreen request failed (expected):', e.message);
-					});
-				}
-			  } catch (e) { 
-		
-				console.debug('Fullscreen request failed (expected):', e.message);
-			  }
-			}
-		
-			document.removeEventListener('pointerdown', requestFS, true);
-			document.removeEventListener('touchstart', requestFS, true);
-			document.removeEventListener('keydown', requestFS, true);
-	  		document.removeEventListener('click', requestFS, true);
-		  };
-		
-		  document.addEventListener('pointerdown', requestFS, { capture: true, passive: true, once: true });
-		  document.addEventListener('touchstart', requestFS, { capture: true, passive: true, once: true });
-		  document.addEventListener('keydown', requestFS, { capture: true, once: true });
-	  	  document.addEventListener('click', requestFS, { capture: true, passive: true, once: true });
-		}
-		const prevent = (e) => { e.preventDefault(); };
-		document.addEventListener('contextmenu', prevent, { capture: true });
-		document.addEventListener('selectstart', prevent, { capture: true });
-		document.addEventListener('gesturestart', prevent, { capture: true });
-		document.addEventListener('gesturechange', prevent, { capture: true });
-		document.addEventListener('gestureend', prevent, { capture: true });
-	  } catch (e) { /* no-op */ }
-	})();
-  </script>
-  <script  type="module" src="./src/newMain.ts"></script>
-
+  <script type="module" src="./src/newMain.ts"></script>
 </head>
 <body>
-
 <div id="app-container">
 	<div id="app"></div>
 </div>
-
 </body>
 </html>

@@ -1,16 +1,15 @@
 {
   "name": "backend",
   "version": "1.0.0",
-  "main": "./dist/server.js",
+  "main": "./out/src/server.js",
   "scripts": {
-    "dev": "tsc && npm run start",
-    "build": "tsc",
+    "dev": "ts-node ./src/server.ts",
+    "build": "tsc -p tsconfig.json",
     "build:lambda": "esbuild src/lambda.ts --bundle --platform=node --target=node18 --external:aws-sdk --outfile=dist/lambda.js",
     "package:lambda": "npm run build:lambda && cd dist && zip -r lambda.zip lambda.js",
-    "clean": "rm -rf dist",
+    "clean": "node -e \"const { rmSync } = require('node:fs'); ['out', 'dist'].forEach((dir) => rmSync(dir, { force: true, recursive: true }));\"",
     "start": "node ./out/src/server.js",
-    "killserver": "kill -9 $(lsof -ti:3001)",
-    "re": "npm run killserver && npm run start"
+    "typecheck": "tsc -p tsconfig.json --noEmit"
   },
   "dependencies": {
     "@vendia/serverless-express": "^4.12.6",
@@ -30,5 +29,5 @@
   },
   "author": "",
   "license": "ISC",
-  "description": ""
+  "description": "Local exhibition backend for the Lair of Riches slot demo"
 }

@@ -5,13 +5,17 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "build": "tsc && vite build",
-    "preview": "vite preview",
-    "test": "tsc ./src/slot/newEngine.ts",
-    "build:atlas": "texture-packer assets/raw --sheet assets/build/atlas.png --data assets/build/atlas.json --format json --trim-mode None",
-    "build:ktx2": "toktx --bcmp --t2 --genmipmap assets/build/atlas.ktx2 assets/build/atlas.png",
-    "build:manifest": "node tools/genManifest.js",
-    "build:assets": "npm run build:atlas && npm run build:ktx2 && npm run build:manifest"
+    "dev:frontend": "vite --host 127.0.0.1",
+    "dev:backend": "npm --prefix backend run dev",
+    "dev:exhibition": "node ./scripts/dev-exhibition.mjs",
+    "typecheck": "tsc --noEmit",
+    "build": "tsc --noEmit && vite build",
+    "build:backend": "npm --prefix backend run build",
+    "build:all": "node ./scripts/smoke-check.mjs",
+    "preview": "vite preview --host 127.0.0.1",
+    "smoke": "node ./scripts/smoke-check.mjs",
+    "test": "npm run smoke",
+    "clean": "node ./scripts/clean.mjs"
   },
   "devDependencies": {
     "@types/howler": "^2.2.12",

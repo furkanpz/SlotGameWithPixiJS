@@ -25,6 +25,9 @@ export class AssetLoader {
 	private _gameClient: GameClient;
 	private _soundsLoaded: boolean = false;
 	private _maxImage: Texture | null = null;
+	private _bonusBackgroundLoadPromise: Promise<boolean> | null = null;
+	private _loadingTicker: Ticker | null = null;
+	private _loadingTickerCallback: (() => void) | null = null;
 
 	constructor (client: GameClient) {
 		this._gameClient = client;
@@ -59,6 +62,39 @@ export class AssetLoader {
 				}
 			}
 		} catch {}
+	}
+
+	private configureVideoSource(videoSource: HTMLVideoElement, autoPlay: boolean): void {
+		try { videoSource.loop = true; } catch {}
+		try { videoSource.muted = true; } catch {}
+		try { (videoSource as any).playsInline = true; } catch {}
+		try { videoSource.setAttribute('playsinline', 'true'); } catch {}
+		try { videoSource.setAttribute('muted', 'true'); } catch {}
+		try { videoSource.autoplay = autoPlay; } catch {}
+		if (autoPlay) {
+			try { videoSource.setAttribute('autoplay', 'true'); } catch {}
+		}
+		try { videoSource.preload = 'auto'; } catch {}
+		if (autoPlay) {
+			try {
+				const playPromise = videoSource.play();
+				if (playPromise && typeof playPromise.catch === 'function') {
+					playPromise.catch(() => {});
+				}
+			} catch {}
+		}
+	}
+
+	private cleanupLoadingTicker(): void {
+		if (this._loadingTicker && this._loadingTickerCallback) {
+			try { this._loadingTicker.remove(this._loadingTickerCallback); } catch {}
+		}
+		if (this._loadingTicker) {
+			try { this._loadingTicker.stop(); } catch {}
+			try { this._loadingTicker.destroy(); } catch {}
+		}
+		this._loadingTicker = null;
+		this._loadingTickerCallback = null;
 	}
 
 	public async loadSymbolTextures(symbols: SymbolType[]): Promise<boolean> {
@@ -129,15 +165,7 @@ export class AssetLoader {
             }
 			const videoSource = videoTexture.source.resource;
 			if (videoSource instanceof HTMLVideoElement) {
-				try { videoSource.loop = true; } catch {}
-				try { videoSource.muted = true; } catch {}
-				try { (videoSource as any).playsInline = true; } catch {}
-				try { videoSource.setAttribute('playsinline', 'true'); } catch {}
-				try { videoSource.setAttribute('muted', 'true'); } catch {}
-				try { videoSource.autoplay = true; } catch {}
-				try { videoSource.setAttribute('autoplay', 'true'); } catch {}
-				try { videoSource.preload = 'auto'; } catch {}
-				try { const p = videoSource.play(); if (p && typeof p.catch === 'function') { p.catch(() => {}); } } catch {}
+				this.configureVideoSource(videoSource, true);
 			} else {
 				console.error("Yüklenen dosya video kaynağı değil.");
 				return false;
@@ -167,15 +195,7 @@ export class AssetLoader {
             }
 			const videoSource = videoTexture.source.resource;
 			if (videoSource instanceof HTMLVideoElement) {
-				try { videoSource.loop = true; } catch {}
-				try { videoSource.muted = true; } catch {}
-				try { (videoSource as any).playsInline = true; } catch {}
-				try { videoSource.setAttribute('playsinline', 'true'); } catch {}
-				try { videoSource.setAttribute('muted', 'true'); } catch {}
-				try { videoSource.autoplay = true; } catch {}
-				try { videoSource.setAttribute('autoplay', 'true'); } catch {}
-				try { videoSource.preload = 'auto'; } catch {}
-				try { const p = videoSource.play(); if (p && typeof p.catch === 'function') { p.catch(() => {}); } } catch {}
+				this.configureVideoSource(videoSource, false);
 			} else {
 				console.error("Yüklenen dosya video kaynağı değil.");
 				return false;
@@ -187,6 +207,18 @@ export class AssetLoader {
 			console.error("Bonus Background frames failed to load:", error);
 			return false;
 		}
+	}
+
+	public async ensureBonusBackgroundFrames(onProgress?: (progress: number) => void): Promise<boolean> {
+		if (this._bonusbackgroundFrames.length > 0) {
+			return true;
+		}
+		if (!this._bonusBackgroundLoadPromise) {
+			this._bonusBackgroundLoadPromise = this.bonusLoadBackgroundFrames(onProgress).finally(() => {
+				this._bonusBackgroundLoadPromise = null;
+			});
+		}
+		return this._bonusBackgroundLoadPromise;
 	}
 
 	public async loadWildFrames(onProgress?: (progress: number) => void): Promise<boolean> {
@@ -270,11 +302,11 @@ export class AssetLoader {
 		const smoothUpdate = (newTarget: number) => {
     		targetProgress = Math.min(Math.max(newTarget, 0), 100);
 		};
-		const ticker = new Ticker();
-		const tickerCallback = () => {
+		this.cleanupLoadingTicker();
+		this._loadingTicker = new Ticker();
+		this._loadingTickerCallback = () => {
 			if (!progressFill || (progressFill as any).destroyed) {
-				ticker.stop();
-				ticker.remove(tickerCallback);
+				this.cleanupLoadingTicker();
 				return;
 			}
 			progressValue += (targetProgress - progressValue) * 0.15;
@@ -284,42 +316,59 @@ export class AssetLoader {
 			updateLoadingProgress(progressValue, progressFill, maxWidth);
 			if (progressValue >= 99.9 && targetProgress >= 99.9) {
 				updateLoadingProgress(100, progressFill, maxWidth);
-				ticker.stop();
-				ticker.remove(tickerCallback);
+				this.cleanupLoadingTicker();
 			}
 		};
 
-		ticker.add(tickerCallback);
-		ticker.start();
+		this._loadingTicker.add(this._loadingTickerCallback);
+		this._loadingTicker.start();
 		const texturesLoaded = await this.loadSymbolTextures(this._gameClient.symbols);
-		if (!texturesLoaded) { errorBox(this._gameClient.app, "Unable to Load Game!"); return false; }
+		if (!texturesLoaded) { this.cleanupLoadingTicker(); errorBox(this._gameClient.app, "Unable to Load Game!"); return false; }
 		smoothUpdate(steps[1]);
 
 		const bgLoaded = await this.loadBackgroundFrames((progress) => {
 			const target = steps[2] + progress * (steps[3] - steps[2]);
 			smoothUpdate(target);
 		});
-		if (!bgLoaded) { errorBox(this._gameClient.app, "Unable to Load Game!"); return false; }
-		const bonusLoaded = await this.bonusLoadBackgroundFrames((progress) => {
-			const target = steps[3] + progress * (steps[4] - steps[3]);
-			smoothUpdate(target);
-		});
-		if (!bonusLoaded) { errorBox(this._gameClient.app, "Unable to Load Game!"); return false; }
+		if (!bgLoaded) { this.cleanupLoadingTicker(); errorBox(this._gameClient.app, "Unable to Load Game!"); return false; }
+		smoothUpdate(steps[3]);
 
 		const wildLoaded = await this.loadWildFrames((progress) => {
 			const target = steps[4] + progress * (steps[5] - steps[4]);
 			smoothUpdate(target);
 		});
-		if (!wildLoaded) { errorBox(this._gameClient.app, "Unable to Load Game!"); return false; }
+		if (!wildLoaded) { this.cleanupLoadingTicker(); errorBox(this._gameClient.app, "Unable to Load Game!"); return false; }
 
 		const frameLoaded = await this.loadFrames();
-		if (!frameLoaded) { errorBox(this._gameClient.app, "Unable to Load Game!"); return false; }
+		if (!frameLoaded) { this.cleanupLoadingTicker(); errorBox(this._gameClient.app, "Unable to Load Game!"); return false; }
 
 		const spinLoaded = await this.loadSpinButtonFrames();
-		if (!spinLoaded) { errorBox(this._gameClient.app, "Unable to Load Game!"); return false; }
+		if (!spinLoaded) { this.cleanupLoadingTicker(); errorBox(this._gameClient.app, "Unable to Load Game!"); return false; }
 
 		smoothUpdate(99);
+		updateLoadingProgress(100, progressFill, maxWidth);
+		this.cleanupLoadingTicker();
 		return true;
+	}
+
+	public preloadDeferredAssets(): void {
+		void this.ensureBonusBackgroundFrames();
+		if (!this._soundsLoaded) {
+			void this.soundLoader();
+		}
+	}
+
+	public dispose(): void {
+		this.cleanupLoadingTicker();
+		const textures = [...this._backgroundFrames, ...this._bonusbackgroundFrames];
+		for (const texture of textures) {
+			const resource = texture?.source?.resource;
+			if (resource instanceof HTMLVideoElement) {
+				try { resource.pause(); } catch {}
+			}
+		}
+		this._backgroundFrames = [];
+		this._bonusbackgroundFrames = [];
 	}
 
 

@@ -2728,6 +2728,31 @@ export class gameInfo {
 			this.autoSpinMenuHandler = null;
 		}
 	}
+
+	private removeAllListenersDeep(node: Container | Sprite | Graphics | Text | null): void {
+		if (!node) {
+			return;
+		}
+		try { (node as any).removeAllListeners?.(); } catch {}
+		if (node instanceof Container) {
+			for (const child of node.children.slice()) {
+				this.removeAllListenersDeep(child as Container | Sprite | Graphics | Text);
+			}
+		}
+	}
+
+	public destroy(): void {
+		this.hideAutoSpinMenu();
+		this.closeMenu();
+		this.removeAllListenersDeep(this.container);
+		this._client.onBalanceChange = () => {};
+		soundManager.stop('bgm');
+		try { this.container.removeFromParent(); } catch {}
+		try { this.container.destroy({ children: true }); } catch {}
+		this.spinButton = null;
+		this.infoButton = null;
+		this.autoSpinButton = null;
+	}
 	public get spinButtonStatic(): Sprite | null {
 		return this.spinButton;
 	}

@@ -113,6 +113,18 @@ export class SoundManager {
         }
     }
 
+    public dispose(): void {
+        for (const howl of this.sounds.values()) {
+            try {
+                howl.stop();
+                howl.unload();
+            } catch {}
+        }
+        this.sounds.clear();
+        this.isInitialized = false;
+        this.soundsLoaded = false;
+    }
+
     public find(alias: string): any {
         try {
             const howl = this.sounds.get(alias);

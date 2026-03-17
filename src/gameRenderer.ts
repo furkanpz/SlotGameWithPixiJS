@@ -72,6 +72,7 @@ export class GameRenderer {
 
 	private animationCallbacks: Set<() => void> = new Set();
 	private isAnimationLoopRunning: boolean = false;
+	private masterAnimationTick: (() => void) | null = null;
 
 	private _spritePool!: SpritePool;
 	private _objectPool!: ObjectPool;
@@ -182,11 +183,12 @@ export class GameRenderer {
 	private startMasterAnimationLoop(): void {
 		if (this.isAnimationLoopRunning) return;
 		this.isAnimationLoopRunning = true;
-		this.app.ticker.add(() => {
+		this.masterAnimationTick = () => {
 			this.animationCallbacks.forEach((callback) => {
 				try { callback(); } catch (error) { console.error('Animation callback error:', error); }
 			});
-		});
+		};
+		this.app.ticker.add(this.masterAnimationTick);
 	}
 
 	public addAnimationCallback(callback: () => void): void {
@@ -696,15 +698,6 @@ export class GameRenderer {
 						this._mobileAccelListenerReady = true;
 					} catch {}
 				}
-				
-				try {
-					if (this.spinButton) {
-						this.spinButton.interactive = true;
-						this.spinButton.on('pointerdown', () => {
-							if (this.isSpinning) this.handleAccelerateTap();
-						});
-					}
-				} catch {}
 				this.drawFrameBackground();
 				this.drawGridLines();
 				this.setupGameInfo();
@@ -1367,7 +1360,14 @@ export class GameRenderer {
 
 		const bonusBackgroundTexture = this.assetLoader.bonusBackgroundFrames[0];
 
-		if (!bonusBackgroundTexture) return;
+		if (!bonusBackgroundTexture) {
+			void this.assetLoader.ensureBonusBackgroundFrames().then((loaded) => {
+				if (loaded) {
+					this.playBonusBackground();
+				}
+			});
+			return;
+		}
 
 		const currentVideoSource = this._backgroundAnimation.texture.source.resource;
 		if (currentVideoSource instanceof HTMLVideoElement) {
@@ -1420,6 +1420,41 @@ export class GameRenderer {
 		}
 	}
 
+	private removeAllListenersDeep(node: Container | Sprite | Graphics | Text | AnimatedSprite | null): void {
+		if (!node) {
+			return;
+		}
+		try { (node as any).removeAllListeners?.(); } catch {}
+		if (node instanceof Container) {
+			for (const child of node.children.slice()) {
+				this.removeAllListenersDeep(child as Container | Sprite | Graphics | Text | AnimatedSprite);
+			}
+		}
+	}
+
+	public destroy(): void {
+		this.clearGrid();
+		try { this.gameAnimations?.clearAllAnimations(); } catch {}
+		this.gameAnimations = null;
+		this.stopBackgroundAnimation();
+		this.animationCallbacks.clear();
+		if (this.masterAnimationTick) {
+			try { this.app.ticker.remove(this.masterAnimationTick); } catch {}
+			this.masterAnimationTick = null;
+		}
+		this.isAnimationLoopRunning = false;
+		this.removeAllListenersDeep(this.container);
+		this._gameUI.destroy();
+		try { this.container.removeFromParent(); } catch {}
+		try { this.container.destroy({ children: true }); } catch {}
+		this.spinButton = null;
+		this._animatedSpinButton = null;
+		this._frameSprite = null;
+		this._framebg = null;
+		this._gridLines = null;
+		this._bgMask = null;
+	}
+
 	public get reelCount(): number {
 		return this.client.reelCount;
 	}
@@ -1428,6 +1463,10 @@ export class GameRenderer {
 	}
 	public get animatedSpinButton(): AnimatedSprite | null {
 		return this._animatedSpinButton;
+	}
+	public get currentBackgroundVideo(): HTMLVideoElement | null {
+		const resource = this._backgroundAnimation?.texture?.source?.resource;
+		return resource instanceof HTMLVideoElement ? resource : null;
 	}
 	public get isSpinning(): boolean {
 		return this._isSpinning;
