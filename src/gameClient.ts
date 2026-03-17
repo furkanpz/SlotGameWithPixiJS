@@ -5,6 +5,7 @@ import { AssetLoader } from "./assetsLoader";
 import { errorBox } from "./game.utils";
 import { gameInfo } from "./GameUI";
 import { GameConstants } from "./GameConstants";
+import { t } from "./i18n";
 type Callback = () => void;
 
 export enum spinType {
@@ -156,7 +157,7 @@ export class GameClient {
 		|| (SpinT == spinType.BONUS_2 && !(this.balance >= amount * 200))
 		|| (SpinT == spinType.BONUS_BOOST && !(this.balance >= amount * 2.5)))
 		{	
-			errorBox(this.app!, "Your balance is too low. Please add funds to play.", 1);
+			errorBox(this.app!, t("errors.lowBalance"), 1);
 			return false;
 		}
 		return true;

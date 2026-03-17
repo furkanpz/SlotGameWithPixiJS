@@ -1,5 +1,6 @@
 import { Application, Graphics, BlurFilter, Text } from "pixi.js";
 import { GameConstants } from "./GameConstants";
+import { t } from "./i18n";
 
 export function scalePx(
   basePx: number,
@@ -55,7 +56,7 @@ export function errorBox(app: Application, text: string, type: number = 0) {
   const y = (app.screen.height - ErrorBoxH) / 2;
   const x = (app.screen.width - ErrorBoxW) / 2;
 
-  const upMessage = getTitleMessage("WHOOPS!", app.screen.width / 2, y + ErrorBoxH * 0.20);
+  const upMessage = getTitleMessage(t("errors.genericTitle"), app.screen.width / 2, y + ErrorBoxH * 0.20);
 
   
   blur.strength = 8;
@@ -87,13 +88,13 @@ export function errorBox(app: Application, text: string, type: number = 0) {
 		window.location.href = GameConstants.home_url;
 	});
 
-	const buttonText = getMessage("Return to Home", btnX + btnWidth / 2, btnY + btnHeight / 2);
+	const buttonText = getMessage(t("errors.returnHome"), btnX + btnWidth / 2, btnY + btnHeight / 2);
 
     app.stage.addChild(button);
     app.stage.addChild(buttonText);
   }
 
-  if (text == "Unable to Load Game!") {
+  if (text === t("errors.loadGameFailed")) {
     app.stage.addChildAt(shadowBox, 1);
     setTimeout(() => {
       window.location.reload();

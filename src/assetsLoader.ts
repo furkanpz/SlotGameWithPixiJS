@@ -7,6 +7,7 @@ import type { GameClient } from './gameClient';
 import { errorBox } from "./game.utils";
 import { soundManager } from "./soundManager";
 import { GameConstants } from './GameConstants';
+import { t } from "./i18n";
 
 
 export class AssetLoader {
@@ -323,27 +324,27 @@ export class AssetLoader {
 		this._loadingTicker.add(this._loadingTickerCallback);
 		this._loadingTicker.start();
 		const texturesLoaded = await this.loadSymbolTextures(this._gameClient.symbols);
-		if (!texturesLoaded) { this.cleanupLoadingTicker(); errorBox(this._gameClient.app, "Unable to Load Game!"); return false; }
+		if (!texturesLoaded) { this.cleanupLoadingTicker(); errorBox(this._gameClient.app, t("errors.loadGameFailed")); return false; }
 		smoothUpdate(steps[1]);
 
 		const bgLoaded = await this.loadBackgroundFrames((progress) => {
 			const target = steps[2] + progress * (steps[3] - steps[2]);
 			smoothUpdate(target);
 		});
-		if (!bgLoaded) { this.cleanupLoadingTicker(); errorBox(this._gameClient.app, "Unable to Load Game!"); return false; }
+		if (!bgLoaded) { this.cleanupLoadingTicker(); errorBox(this._gameClient.app, t("errors.loadGameFailed")); return false; }
 		smoothUpdate(steps[3]);
 
 		const wildLoaded = await this.loadWildFrames((progress) => {
 			const target = steps[4] + progress * (steps[5] - steps[4]);
 			smoothUpdate(target);
 		});
-		if (!wildLoaded) { this.cleanupLoadingTicker(); errorBox(this._gameClient.app, "Unable to Load Game!"); return false; }
+		if (!wildLoaded) { this.cleanupLoadingTicker(); errorBox(this._gameClient.app, t("errors.loadGameFailed")); return false; }
 
 		const frameLoaded = await this.loadFrames();
-		if (!frameLoaded) { this.cleanupLoadingTicker(); errorBox(this._gameClient.app, "Unable to Load Game!"); return false; }
+		if (!frameLoaded) { this.cleanupLoadingTicker(); errorBox(this._gameClient.app, t("errors.loadGameFailed")); return false; }
 
 		const spinLoaded = await this.loadSpinButtonFrames();
-		if (!spinLoaded) { this.cleanupLoadingTicker(); errorBox(this._gameClient.app, "Unable to Load Game!"); return false; }
+		if (!spinLoaded) { this.cleanupLoadingTicker(); errorBox(this._gameClient.app, t("errors.loadGameFailed")); return false; }
 
 		smoothUpdate(99);
 		updateLoadingProgress(100, progressFill, maxWidth);

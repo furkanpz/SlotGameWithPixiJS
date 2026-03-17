@@ -12,7 +12,16 @@ import { ReelAnimator } from "./reelAnimations";
 import { soundManager } from "./soundManager";
 import { SpritePool } from "./objPool";
 import { ObjectPool } from "./objPool";
+import { formatCurrency, getContinuePrompt, t } from "./i18n";
 
+export interface AnimationFrameInfo {
+	deltaMS: number;
+	deltaRatio: number;
+	elapsedMS: number;
+	timestamp: number;
+}
+
+type AnimationCallback = (...args: any[]) => void;
 
 export class GameRenderer {
 	private container: Container;
@@ -70,9 +79,13 @@ export class GameRenderer {
 	private coordinateGrid: { x: number; y: number; }[][] = [];
 	private isCoordinateGridInitialized: boolean = false;
 
-	private animationCallbacks: Set<() => void> = new Set();
+	private animationCallbacks: Set<AnimationCallback> = new Set();
 	private isAnimationLoopRunning: boolean = false;
 	private masterAnimationTick: (() => void) | null = null;
+	private masterAnimationElapsedMS: number = 0;
+	private desktopQualityMonitorId: number | null = null;
+	private desktopFpsSamples: number[] = [];
+	private _effectQualityTier: 0 | 1 | 2 = 0;
 
 	private _spritePool!: SpritePool;
 	private _objectPool!: ObjectPool;
@@ -139,7 +152,8 @@ export class GameRenderer {
 		this.hasAccelerated = false;
 		this.winDetails = [];
 		this.wildPositions = [];
-	this.startMasterAnimationLoop();
+		this.startMasterAnimationLoop();
+		this.startDesktopQualityMonitor();
 		void this._usedPrivateMethods;
 	}
 
@@ -184,19 +198,64 @@ export class GameRenderer {
 		if (this.isAnimationLoopRunning) return;
 		this.isAnimationLoopRunning = true;
 		this.masterAnimationTick = () => {
-			this.animationCallbacks.forEach((callback) => {
-				try { callback(); } catch (error) { console.error('Animation callback error:', error); }
-			});
+			const rawDeltaMS = this.app.ticker.deltaMS || GameConstants.PERFORMANCE.FRAME_MS_60FPS;
+			const deltaMS = Math.min(rawDeltaMS, 34);
+			this.masterAnimationElapsedMS += deltaMS;
+			const frame: AnimationFrameInfo = {
+				deltaMS,
+				deltaRatio: GameConstants.toFrameDeltaRatio(deltaMS),
+				elapsedMS: this.masterAnimationElapsedMS,
+				timestamp: performance.now(),
+			};
+			for (const callback of Array.from(this.animationCallbacks)) {
+				try { callback(frame); } catch (error) { console.error('Animation callback error:', error); }
+			}
 		};
 		this.app.ticker.add(this.masterAnimationTick);
 	}
 
-	public addAnimationCallback(callback: () => void): void {
+	public addAnimationCallback(callback: AnimationCallback): void {
 		this.animationCallbacks.add(callback);
 	}
 
-	public removeAnimationCallback(callback: () => void): void {
+	public removeAnimationCallback(callback: AnimationCallback): void {
 		this.animationCallbacks.delete(callback);
+	}
+
+	public get effectQualityTier(): 0 | 1 | 2 {
+		return this._effectQualityTier;
+	}
+
+	private startDesktopQualityMonitor(): void {
+		if (GameConstants.IS_MOBILE || this.desktopQualityMonitorId !== null) {
+			return;
+		}
+		this.desktopQualityMonitorId = window.setInterval(() => {
+			const fps = this.app.ticker.FPS || 0;
+			if (!fps) {
+				return;
+			}
+			this.desktopFpsSamples.push(fps);
+			if (this.desktopFpsSamples.length > GameConstants.PERFORMANCE.DESKTOP_SAMPLE_SIZE) {
+				this.desktopFpsSamples.shift();
+			}
+			const averageFps = this.desktopFpsSamples.reduce((sum, value) => sum + value, 0) / this.desktopFpsSamples.length;
+			if (averageFps <= GameConstants.PERFORMANCE.DESKTOP_MINIMAL_FPS) {
+				this._effectQualityTier = 2;
+				return;
+			}
+			if (averageFps <= GameConstants.PERFORMANCE.DESKTOP_DEGRADE_FPS) {
+				this._effectQualityTier = Math.max(this._effectQualityTier, 1) as 1 | 2;
+				return;
+			}
+			if (averageFps >= GameConstants.PERFORMANCE.DESKTOP_RECOVER_FULL_FPS) {
+				this._effectQualityTier = 0;
+				return;
+			}
+			if (averageFps >= GameConstants.PERFORMANCE.DESKTOP_RECOVER_REDUCED_FPS && this._effectQualityTier > 1) {
+				this._effectQualityTier = 1;
+			}
+		}, 1000);
 	}
 
 	private initializeCoordinateGrid(): void {
@@ -436,7 +495,7 @@ export class GameRenderer {
 
 			const volText = this.objectPool.acquireText();
 			pooledTexts.push(volText);
-			volText.text = "VOLATILITY: VERY HIGH";
+			volText.text = t("infoOverlay.volatilityVeryHigh");
 			try { (volText.style as any).fontFamily = "Bebas Neue"; } catch {}
 			try { (volText.style as any).fontSize = scalePx(22, this.app.screen.width, this.app.screen.height); } catch {}
 			try { (volText.style as any).fill = 0x000000; } catch {}
@@ -454,18 +513,18 @@ export class GameRenderer {
 
 
 		const box1 = createBox(
-			"WOLF SYMBOLS",
-			"The Wolf symbol expands to cover the reels and activates a powerful multiplier feature. Each win can be boosted up to 200x, bringing massive potential rewards!",
+			t("infoOverlay.wolfSymbols.title"),
+			t("infoOverlay.wolfSymbols.description"),
 			this.assetLoader.symbolTextures[8],
 		);
 		const box2 = createBox(
-			"FREE GAMES",
-			"During Free Games, more Wolf symbols appear on the reels, increasing your chances of big wins. Trigger the bonus with 4 Scatters and every spin is guaranteed to feature a Wolf symbol!",
+			t("infoOverlay.freeGames.title"),
+			t("infoOverlay.freeGames.description"),
 			this.assetLoader.symbolTextures[1],
 		);
 		const box3 = createBox(
-			"MAX WIN",
-			"Unleash the ultimate power of the Wolves! In the mysterious forest, every spin can lead to colossal wins. Watch the reels as the Wolves dominate, bringing the chance for legendary rewards!",
+			t("infoOverlay.maxWin.title"),
+			t("infoOverlay.maxWin.description"),
 			this.assetLoader.maxImage!,
 		);
 		const totalWidth = boxWidth * 3 + spacing * 2;
@@ -1438,6 +1497,10 @@ export class GameRenderer {
 		this.gameAnimations = null;
 		this.stopBackgroundAnimation();
 		this.animationCallbacks.clear();
+		if (this.desktopQualityMonitorId !== null) {
+			window.clearInterval(this.desktopQualityMonitorId);
+			this.desktopQualityMonitorId = null;
+		}
 		if (this.masterAnimationTick) {
 			try { this.app.ticker.remove(this.masterAnimationTick); } catch {}
 			this.masterAnimationTick = null;
@@ -1654,7 +1717,7 @@ export class GameRenderer {
 	const mainTitle = this.objectPool.acquireContainer();
 
 	const titleTextContent = this.objectPool.acquireText();
-	titleTextContent.text = "YOU WON 10 FREE SPINS";
+	titleTextContent.text = t("freeSpins.awardedTitle");
 	try { (titleTextContent.style as any).fontFamily = GameConstants.FONTS.DEFAULT; } catch {}
 	try { (titleTextContent.style as any).fontSize = scalePx(48, this.app.screen.width, this.app.screen.height); } catch {}
 	try { (titleTextContent.style as any).fill = GameConstants.COLORS.WHITE; } catch {}
@@ -1669,7 +1732,7 @@ export class GameRenderer {
 		mainTitle.scale.set(0.5);
 
 	const subtitleText = this.objectPool.acquireText();
-	subtitleText.text = `You’ve entered the bonus round! Expect more Extra Wilds on the reels and a higher chance of landing the Wolf symbol with its expanding multiplier.`;
+	subtitleText.text = t("freeSpins.introDescription");
 	try { (subtitleText.style as any).fontFamily = GameConstants.FONTS.DEFAULT; } catch {}
 	try { (subtitleText.style as any).fontSize = scalePx(32, this.app.screen.width, this.app.screen.height); } catch {}
 	try { (subtitleText.style as any).fill = GameConstants.COLORS.WHITE; } catch {}
@@ -1681,7 +1744,7 @@ export class GameRenderer {
 	subtitleText.alpha = 0;
 
 	const clickToContinueText = this.objectPool.acquireText();
-	clickToContinueText.text = "Click to Continue";
+	clickToContinueText.text = getContinuePrompt();
 	try { (clickToContinueText.style as any).fontFamily = GameConstants.FONTS.DEFAULT; } catch {}
 	try { (clickToContinueText.style as any).fontSize = scalePx(28, this.app.screen.width, this.app.screen.height); } catch {}
 	try { (clickToContinueText.style as any).fill = GameConstants.COLORS.GOLD; } catch {}
@@ -1985,7 +2048,7 @@ export class GameRenderer {
 		summaryContainer.zIndex = 9999;
 
 		const titleText = this.objectPool.acquireText();
-		titleText.text = 'FREE SPINS COMPLETED!';
+		titleText.text = t("freeSpins.completedTitle");
 		try { (titleText.style as any).fontFamily = GameConstants.FONTS.DEFAULT; } catch {}
 		try { (titleText.style as any).fontSize = scalePx(56, this.app.screen.width, this.app.screen.height); } catch {}
 		try { (titleText.style as any).fill = GameConstants.COLORS.GOLD; } catch {}
@@ -1994,7 +2057,7 @@ export class GameRenderer {
 		titleText.y = -80;
 
 		const winText = this.objectPool.acquireText();
-		winText.text = '$0.00';
+		winText.text = formatCurrency(0, GameConstants.currency);
 		try { (winText.style as any).fontFamily = GameConstants.FONTS.DEFAULT; } catch {}
 		try { (winText.style as any).fontSize = scalePx(72, this.app.screen.width, this.app.screen.height); } catch {}
 		try { (winText.style as any).fill = GameConstants.COLORS.WHITE; } catch {}
@@ -2003,7 +2066,7 @@ export class GameRenderer {
 		winText.y = 20;
 
 		const clickText = this.objectPool.acquireText();
-		clickText.text = 'Click to Continue';
+		clickText.text = getContinuePrompt();
 		try { (clickText.style as any).fontFamily = GameConstants.FONTS.DEFAULT; } catch {}
 		try { (clickText.style as any).fontSize = scalePx(36, this.app.screen.width, this.app.screen.height); } catch {}
 		try { (clickText.style as any).fill = GameConstants.COLORS.GOLD; } catch {}
@@ -2109,7 +2172,7 @@ export class GameRenderer {
 				const minCurrency = this.client.minCreditCurrency || 1;
 				const targetAmount = (totalWin / minCredit) * minCurrency;
 				const currentAmount = targetAmount * (winEase * winEase);
-				winText.text = `${GameConstants.currency}${currentAmount.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+				winText.text = formatCurrency(currentAmount, GameConstants.currency);
 			}
 
 			if (progress > 0.7) {
@@ -2121,7 +2184,7 @@ export class GameRenderer {
 
 			if (progress >= 1) {
 				const finalAmount = this._totalFreespinWin / this.client.minAmountCredit * this.client.minCreditCurrency;
-				winText.text = `${GameConstants.currency}${finalAmount.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+				winText.text = formatCurrency(finalAmount, GameConstants.currency);
 				winText.scale.set(1);
 				titleText.scale.set(1);
 				clickText.scale.set(1);

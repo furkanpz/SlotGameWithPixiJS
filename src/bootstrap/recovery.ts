@@ -1,4 +1,5 @@
 import { DisposableStore } from "./disposables";
+import { t } from "../i18n";
 
 const isBenignError = (error: unknown): boolean => {
   try {
@@ -77,7 +78,7 @@ export class RecoveryController {
 
     this.button = document.createElement("button");
     this.button.type = "button";
-    this.button.textContent = "Retry";
+    this.button.textContent = t("recovery.retry");
     this.button.style.cssText =
       "display:none;border:0;background:#fe7743;color:#000;font-weight:700;padding:12px 20px;cursor:pointer;font-size:13px;text-transform:uppercase;letter-spacing:0.04em;";
     this.button.addEventListener("click", () => {
@@ -89,7 +90,7 @@ export class RecoveryController {
     document.body.appendChild(this.overlay);
   }
 
-  public showRecovering(message = "Recovering…"): void {
+  public showRecovering(message = t("recovery.recovering")): void {
     this.ensureOverlay();
     if (this.label) {
       this.label.textContent = message;
@@ -100,11 +101,10 @@ export class RecoveryController {
     }
   }
 
-  public showFatal(error: unknown): void {
+  public showFatal(_error: unknown): void {
     this.ensureOverlay();
     if (this.label) {
-      const message = error instanceof Error ? error.message : "Unable to start the game";
-      this.label.textContent = message || "Unable to start the game";
+      this.label.textContent = t("recovery.unableToStartGame");
     }
     if (this.button) {
       this.button.style.display = "inline-flex";
@@ -128,7 +128,7 @@ export class RecoveryController {
       return;
     }
     this.autoRestartCount += 1;
-    this.showRecovering("Recovering…");
+    this.showRecovering(t("recovery.recovering"));
     void this.restart().catch((error) => {
       this.showFatal(error);
     });
@@ -136,7 +136,7 @@ export class RecoveryController {
 
   public async retry(): Promise<void> {
     this.autoRestartCount = 0;
-    this.showRecovering("Retrying…");
+    this.showRecovering(t("recovery.retrying"));
     try {
       await this.restart();
     } catch (error) {

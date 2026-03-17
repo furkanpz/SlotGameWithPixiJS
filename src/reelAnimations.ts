@@ -4,6 +4,7 @@ import { GameConstants } from "./GameConstants";
 import { scalePx } from "./game.utils";
 import { SpritePool } from "./objPool";
 import { soundManager } from "./soundManager";
+import type { AnimationFrameInfo } from "./gameRenderer";
 
 
 
@@ -18,13 +19,12 @@ export class ReelAnimator {
 	public isSpinning = false;
 	private symbolSize: number;
 	private initalGrid: Record<string, any>;
-	private boundUpdate: (() => void) | null = null;
+	private boundUpdate: ((frame: AnimationFrameInfo) => void) | null = null;
 	private spinSpeed = GameConstants.SPIN_SPEED_NORMAL; 
 	private minSpeed = GameConstants.MIN_SPEED_NORMAL;
 	private deceleration = GameConstants.DECELERATION_NORMAL;
 	private startDelay: number;
 	private ssss = true;
-	private startTime: number;
 	private gameRenderer: any;
 	private _turboLevel: number = 0;
 	private _turboLevel_for_sound: number = 0;
@@ -32,7 +32,6 @@ export class ReelAnimator {
 	private offsetY = GameConstants.getGridOffsetY();
 	private _spritePool: SpritePool;
 	private startBouncePhase: 'pullback' | 'acceleration' | 'normal' = 'pullback';
-	private startBounceTime: number = 0;
 	private initialPositions: number[] = [];
 	private isActive: boolean = true;
 	
@@ -40,6 +39,9 @@ export class ReelAnimator {
 	private lowQualityApplied: boolean = false;
 	private qualityRestored: boolean = false;
 	private readonly qualityScaleFactor: number = 0.92; 
+	private startDelayRemainingMs: number = 0;
+	private bounceElapsedMs: number = 0;
+	private overshootCallback: ((frame: AnimationFrameInfo) => void) | null = null;
     
 
 
@@ -66,11 +68,10 @@ export class ReelAnimator {
 		this.currentIndex =  (stopIndex + distance + this.reelData.length) % this.reelData.length;
 		this.symbolSize = GameConstants.REEL_SIZE;
 		this.initalGrid = initalGrid;
-		this.startDelay = reelIndex * GameConstants.REEL_START_DELAY;
-		this.startTime = Date.now();
-
 		this._turboLevel_for_sound = this.gameRenderer.turboLevel;
 		this.setTurboLevel(this.gameRenderer.turboLevel);
+		this.startDelay = reelIndex * GameConstants.getReelStartDelay(this._turboLevel);
+		this.startDelayRemainingMs = this.startDelay;
 		this.boundUpdate = this.update.bind(this);
 		this.gameRenderer.addAnimationCallback(this.boundUpdate as any);
 		this.initSymbols();
@@ -118,23 +119,25 @@ export class ReelAnimator {
 			this.gameRenderer.reel_sounds_effects(`start`);
 	}
  
-	private update() {
+	private update(frame?: AnimationFrameInfo) {
 		if (!this.isActive) return;
+		const deltaMS = frame?.deltaMS ?? GameConstants.PERFORMANCE.FRAME_MS_60FPS;
+		const deltaRatio = frame?.deltaRatio ?? 1;
 
 		
 		{
 			const skipEndSlowdown = false; 
 			if (!this.isSpinning) {
-				if (Date.now() - this.startTime < this.startDelay) return;
+				this.startDelayRemainingMs -= deltaMS;
+				if (this.startDelayRemainingMs > 0) return;
 				this.isSpinning = true;
-				this.startBounceTime = Date.now();
+				this.bounceElapsedMs = 0;
 				this.startBouncePhase = 'pullback';
 			}
 			if (this.symbols.length === 0) return;
-			const currentTime = Date.now();
-			const bounceElapsed = currentTime - this.startBounceTime;
+			this.bounceElapsedMs += deltaMS;
 			if (this.startBouncePhase === 'pullback') {
-				const progress = Math.min(bounceElapsed / GameConstants.PULLBACK_DISTANCE, 1);
+				const progress = Math.min(this.bounceElapsedMs / GameConstants.pullbackDuration, 1);
 				const easeOut = 1 - Math.pow(1 - progress, 3);
 				const pullbackOffset = GameConstants.PULLBACK_DISTANCE * easeOut;
 
@@ -144,12 +147,12 @@ export class ReelAnimator {
 
 				if (progress >= 1) {
 					this.startBouncePhase = 'acceleration';
-					this.startBounceTime = currentTime;
+					this.bounceElapsedMs = 0;
 				}
 				return;
 			}
 	    if (this.startBouncePhase === 'acceleration') {
-				const progress = Math.min(bounceElapsed / GameConstants.PULLBACK_AACCELERATION_DURATION, 1);
+				const progress = Math.min(this.bounceElapsedMs / GameConstants.PULLBACK_AACCELERATION_DURATION, 1);
 				const easeIn = Math.pow(progress, 2);
 				const totalDistance = GameConstants.PULLBACK_DISTANCE + (this.symbolSize * 0.3);
 				const accelerationOffset = totalDistance * easeIn;
@@ -170,7 +173,7 @@ export class ReelAnimator {
 			}
 
 			for (const sprite of this.symbols) {
-				sprite.y += this.spinSpeed;
+				sprite.y += this.spinSpeed * deltaRatio;
 			}
 
 			
@@ -231,11 +234,11 @@ export class ReelAnimator {
 				if (shouldSlowDown) {
 					const factor = (this._turboLevel > 0) ? 0.9 : 0.95;
 					if ((distance >= 0 && distance <= 8) || (Ldistance >= 0 && Ldistance <= 10)) {
-						this.spinSpeed = Math.max(this.spinSpeed * factor, this.minSpeed * 0.5);
+						this.spinSpeed = Math.max(this.spinSpeed * Math.pow(factor, deltaRatio), this.minSpeed * 0.5);
 					}
 				} else {
 					if (distance >= 0 && distance <= 4) {
-						this.spinSpeed = Math.max(this.spinSpeed * this.deceleration, this.minSpeed);
+						this.spinSpeed = Math.max(this.spinSpeed * Math.pow(this.deceleration, deltaRatio), this.minSpeed);
 					}
 				}
 			}
@@ -268,6 +271,7 @@ export class ReelAnimator {
 		if (this.lowQualityApplied) return;
 		this.lowQualityActive = true;
 		this.lowQualityApplied = true;
+		const qualityScaleFactor = this.gameRenderer?.effectQualityTier === 2 ? 0.88 : this.qualityScaleFactor;
 		try {
 			for (const sprite of this.symbols) {
 				const src: any = sprite.texture?.source;
@@ -275,7 +279,7 @@ export class ReelAnimator {
 					
 					src.style.scaleMode = 'nearest';
 				}
-				const sizeRatio = GameConstants.SYMBOL_SIZE_RATIO * this.qualityScaleFactor;
+				const sizeRatio = GameConstants.SYMBOL_SIZE_RATIO * qualityScaleFactor;
 				sprite.width = this.symbolSize * sizeRatio;
 				sprite.height = this.symbolSize * sizeRatio;
 			}
@@ -299,9 +303,10 @@ export class ReelAnimator {
 	}
 
 	public stopSpin() {
-		const slowDownTick = () => {
+		const slowDownTick = (frame?: AnimationFrameInfo) => {
+			const deltaRatio = frame?.deltaRatio ?? 1;
 			if (this.spinSpeed > this.minSpeed) {
-				this.spinSpeed -= this.deceleration;
+				this.spinSpeed = Math.max(this.spinSpeed - (this.minSpeed * 0.08 * deltaRatio), this.minSpeed);
 			} else {
 				try { this.gameRenderer.removeAnimationCallback(slowDownTick as any); } catch {}
 				this.finalizeStop();
@@ -385,25 +390,29 @@ export class ReelAnimator {
 			return;
 		const overshootAmount = scalePx(35, this.client.app?.screen.width, this.client.app?.screen.height);
 		const duration = 180;
-		let startTime = Date.now();
+		let elapsedMs = 0;
 		
 		const originalPositions = this.symbols.map(sprite => sprite.y);
 		
-		const animate = () => {
-			const elapsed = Date.now() - startTime;
-			const progress = Math.min(elapsed / duration, 1);
+		const animate = (frame?: AnimationFrameInfo) => {
+			elapsedMs += frame?.deltaMS ?? GameConstants.PERFORMANCE.FRAME_MS_60FPS;
+			const progress = Math.min(elapsedMs / duration, 1);
 			const bounce = Math.sin(progress * Math.PI) * (1 - progress);
 			this.symbols.forEach((sprite, index) => {
 				sprite.y = originalPositions[index] + (overshootAmount * bounce);
 			});
 			
 			if (progress < 1) {
-				this.gameRenderer.addAnimationCallback(animate as any);
+				return;
 			} else {
+				this.overshootCallback = null;
 				this.gameRenderer.removeAnimationCallback(animate as any);
 			}
 		};
-		
+		if (this.overshootCallback) {
+			try { this.gameRenderer.removeAnimationCallback(this.overshootCallback as any); } catch {}
+		}
+		this.overshootCallback = animate;
 		this.gameRenderer.addAnimationCallback(animate as any);
 	}
 		public get Symbols()
@@ -415,12 +424,16 @@ export class ReelAnimator {
 			return this.isSpinning;
 		}
 
-		public destroy() {
+	public destroy() {
 				this.isSpinning = false;
 				this.isActive = false;
 			if (this.boundUpdate) {
 				try { this.gameRenderer.removeAnimationCallback(this.boundUpdate as any); } catch {}
 				this.boundUpdate = null;
+			}
+			if (this.overshootCallback) {
+				try { this.gameRenderer.removeAnimationCallback(this.overshootCallback as any); } catch {}
+				this.overshootCallback = null;
 			}
 		
 		
@@ -447,9 +460,10 @@ export class ReelAnimator {
 			
 			this.isSpinning = true;
 			this.ssss = true;
-			this.startTime = Date.now();
+			this.startDelay = this.reelIndex * GameConstants.getReelStartDelay(this._turboLevel);
+			this.startDelayRemainingMs = this.startDelay;
 			this.startBouncePhase = 'pullback';
-			this.startBounceTime = 0;
+			this.bounceElapsedMs = 0;
 			if (onComplete) {
 				const checkCompleteTick = () => {
 					if (!this.isSpinning) {
@@ -463,9 +477,10 @@ export class ReelAnimator {
 			
 			this.isSpinning = true;
 			this.ssss = true;
-			this.startTime = Date.now();
+			this.startDelay = this.reelIndex * GameConstants.getReelStartDelay(this._turboLevel);
+			this.startDelayRemainingMs = this.startDelay;
 			this.startBouncePhase = 'pullback';
-			this.startBounceTime = 0;
+			this.bounceElapsedMs = 0;
 			if (onComplete) {
 				const checkCompleteTick = () => {
 					if (!this.isSpinning) {

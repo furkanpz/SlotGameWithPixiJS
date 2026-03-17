@@ -7,6 +7,7 @@ import { GameRenderer } from "../gameRenderer";
 import { LayoutManager } from "../LayoutManager";
 import { updateLoadingProgress } from "../progressUI";
 import { soundManager } from "../soundManager";
+import { t } from "../i18n";
 import { DisposableStore } from "./disposables";
 import { GameBindings } from "./gameBindings";
 import {
@@ -109,7 +110,7 @@ export class GameSession {
     updateLoadingProgress(steps[0], progressFill, maxWidth);
     await gameClient.initialize();
     if (!gameClient.clientOk) {
-      errorBox(gameClient.app, "Unable to Load Game!");
+      errorBox(gameClient.app, t("errors.loadGameFailed"));
       updateLoadingProgress(steps[1], progressFill, maxWidth);
       throw new Error("Game client initialization failed");
     }

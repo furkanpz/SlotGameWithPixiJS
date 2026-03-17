@@ -1,9 +1,10 @@
 import { Container, AnimatedSprite, Graphics, Text, TextStyle } from "pixi.js";
 import { scalePx } from "./game.utils";
-import type { GameRenderer } from "./gameRenderer";
+import type { AnimationFrameInfo, GameRenderer } from "./gameRenderer";
 import { GameConstants } from "./GameConstants";
 import { StyleConstants } from "./StyleConstants";
 import { soundManager } from "./soundManager";
+import { formatCurrency, t } from "./i18n";
 
 export interface WildPosition {
 	column: number;
@@ -57,7 +58,6 @@ export class GameAnimations {
 	private paylineCompleted = 0;
 	private clickToSkip = false;
 	private lastMilestone = 0;
-	private milestoneAnimationStartTime = 0;
 	private isMilestoneAnimating = false;
 	private offsetX = GameConstants.getGridOffsetX();
 	private offsetY = GameConstants.getGridOffsetY();
@@ -67,6 +67,7 @@ export class GameAnimations {
 	private coordinateCache = new Map<string, { x: number, y: number }>();
 	private preFilteredWildsByColumn = new Map<number, WildPosition[]>();
 	private styleConstants = StyleConstants.getInstance();
+	private managedCallbacks = new Set<(frame: AnimationFrameInfo) => void>();
 
 	
 
@@ -93,6 +94,26 @@ export class GameAnimations {
 			} catch {}
 		}
 	private acquireContainer(): Container { return this.pool ? this.pool.acquireContainer() : new Container(); }
+
+	private formatMoney(value: number): string {
+		return formatCurrency(value, GameConstants.currency);
+	}
+
+	private getBigWinTitleText(stage: "win" | "big" | "mega" | "superMega" | "epic" | "max"): string {
+		return t(`bigWin.${stage}`);
+	}
+
+	private getBigWinTitleTexts(): string[] {
+		return [
+			this.getBigWinTitleText("win"),
+			this.getBigWinTitleText("big"),
+			this.getBigWinTitleText("mega"),
+			this.getBigWinTitleText("superMega"),
+			this.getBigWinTitleText("epic"),
+			this.getBigWinTitleText("max"),
+			`${this.getBigWinTitleText("big")}!`,
+		];
+	}
 
 	constructor(
 		container: Container, 
@@ -137,6 +158,7 @@ export class GameAnimations {
 	}
 
 	public clearAllAnimations(): void {		
+		this.clearManagedCallbacks();
 		this.isWildAnimationsPlaying = false;
 		this.isPaylineAnimationsPlaying = false;
 		this.isSlowDetailedAnimationPlaying = false;
@@ -153,11 +175,56 @@ export class GameAnimations {
 		this.paylineCompleted = 0;
 		this.clickToSkip = false;
 		this.lastMilestone = 0;
-		this.milestoneAnimationStartTime = 0;
 		this.isMilestoneAnimating = false;
 		this.multiplierCache.clear();
 		this.coordinateCache.clear();
 		this.preFilteredWildsByColumn.clear();
+	}
+
+	private clearManagedCallbacks(): void {
+		if (!this._gamerenderer) {
+			this.managedCallbacks.clear();
+			return;
+		}
+		for (const callback of this.managedCallbacks) {
+			try { this._gamerenderer.removeAnimationCallback(callback); } catch {}
+		}
+		this.managedCallbacks.clear();
+	}
+
+	private scheduleManaged(step: (frame: AnimationFrameInfo) => boolean | void): () => void {
+		if (!this._gamerenderer) {
+			return () => {};
+		}
+		const callback = (frame: AnimationFrameInfo) => {
+			const keepRunning = step(frame);
+			if (keepRunning === false) {
+				try { this._gamerenderer?.removeAnimationCallback(callback); } catch {}
+				this.managedCallbacks.delete(callback);
+			}
+		};
+		this.managedCallbacks.add(callback);
+		this._gamerenderer.addAnimationCallback(callback);
+		return () => {
+			try { this._gamerenderer?.removeAnimationCallback(callback); } catch {}
+			this.managedCallbacks.delete(callback);
+		};
+	}
+
+	private scheduleDelay(delayMs: number, onComplete: () => void): () => void {
+		let elapsed = 0;
+		return this.scheduleManaged((frame) => {
+			elapsed += frame.deltaMS;
+			if (elapsed >= delayMs) {
+				onComplete();
+				return false;
+			}
+			return true;
+		});
+	}
+
+	private get effectQualityTier(): 0 | 1 | 2 {
+		return this._gamerenderer?.effectQualityTier ?? 0;
 	}
 	
 	private preFilterWildPositions(wildPositions?: WildPosition[]): void {
@@ -175,7 +242,7 @@ export class GameAnimations {
 	private clearWildAnimations(): void {
 		this.wildAnimations.forEach(wildAnim => {
 			if (wildAnim.parent) {
-				this.container.removeChild(wildAnim);
+				wildAnim.parent.removeChild(wildAnim);
 			}
 			wildAnim.destroy();
 		});
@@ -185,13 +252,13 @@ export class GameAnimations {
 	private clearWheelAnimations(): void {
 		this.wheelAnimations.forEach(wheelAnim => {
 			if (wheelAnim.wheel.parent) {
-				this.container.removeChild(wheelAnim.wheel);
+				wheelAnim.wheel.parent.removeChild(wheelAnim.wheel);
 			}
 			if (wheelAnim.topText.parent) {
-				this.container.removeChild(wheelAnim.topText);
+				wheelAnim.topText.parent.removeChild(wheelAnim.topText);
 			}
 			if (wheelAnim.bottomText.parent) {
-				this.container.removeChild(wheelAnim.bottomText);
+				wheelAnim.bottomText.parent.removeChild(wheelAnim.bottomText);
 			}
 			if (wheelAnim.border.parent) {
 				try { wheelAnim.border.parent.removeChild(wheelAnim.border); } catch {}
@@ -207,7 +274,7 @@ export class GameAnimations {
 	private clearPaylineAnimations(): void {
 		this.paylineGraphics.forEach(paylineGraphic => {
 			if (paylineGraphic.parent) {
-				this.container.removeChild(paylineGraphic);
+				paylineGraphic.parent.removeChild(paylineGraphic);
 			}
 			paylineGraphic.destroy();
 		});
@@ -237,9 +304,10 @@ export class GameAnimations {
 		const parentsToScan: Container[] = [];
 		try { if (this.container) parentsToScan.push(this.container); } catch {}
 		try { if (this.fxOverlay) parentsToScan.push(this.fxOverlay); } catch {}
+		const titleTexts = this.getBigWinTitleTexts();
 		parentsToScan.forEach(parent => {
 			const titles = parent.children.filter(child => 
-				child instanceof Text && ['BIG WIN!', 'BIG WIN', 'MEGA WIN', 'SUPER MEGA WIN', 'EPIC WIN', 'MAX WIN', 'WIN'].includes(child.text)
+				child instanceof Text && titleTexts.includes(child.text)
 			);
 			titles.forEach((title: any) => {
 				try { if (title.parent) title.parent.removeChild(title); } catch {}
@@ -285,7 +353,6 @@ export class GameAnimations {
 		this.paylineCompleted = 0;
 		this.clickToSkip = false;
 		this.lastMilestone = 0;
-		this.milestoneAnimationStartTime = 0;
 		this.isMilestoneAnimating = false;
 	}
 
@@ -342,9 +409,9 @@ export class GameAnimations {
 			} else {
 				delay = GameConstants.WILD_ANIMATION.DELAY_NORMAL;
 			}
-			setTimeout(() => {
+			this.scheduleDelay(delay, () => {
 				this.playWildAnimationsSequentially(columns, index + 1, wildPositions, onComplete);
-			}, delay);
+			});
 		});
 	}
 
@@ -477,17 +544,15 @@ export class GameAnimations {
 		const turboLevel = this._gamerenderer ? this._gamerenderer.turboLevel : 0;
 		const blinkDuration = GameConstants.getWildBlinkDuration(turboLevel);
 		const blinkCycleSpeed = GameConstants.getWildBlinkCycleSpeed(turboLevel);
-		
-		const blinkStartTime = Date.now();
-		
-		const blinkAnimation = () => {
-			const elapsed = Date.now() - blinkStartTime;
+		let elapsed = 0;
+		this.scheduleManaged((frame) => {
+			elapsed += frame.deltaMS;
 			
 			if (this._gamerenderer && this._gamerenderer.turboLevel === 2) {
 				topText.alpha = 1;
 				bottomText.alpha = 1;
 				this.selectWinner(selectedText, otherText, onComplete);
-				return;
+				return false;
 			}
 			
 			if (elapsed < blinkDuration) {
@@ -496,16 +561,14 @@ export class GameAnimations {
 				
 				topText.alpha = alpha;
 				bottomText.alpha = alpha;
-				
-				requestAnimationFrame(blinkAnimation);
+				return true;
 			} else {
 				topText.alpha = 1;
 				bottomText.alpha = 1;
 				this.selectWinner(selectedText, otherText, onComplete);
+				return false;
 			}
-		};
-		
-		requestAnimationFrame(blinkAnimation);
+		});
 	}
 	
 	private selectWinner(selectedText: Text, otherText: Text, onComplete?: () => void): void {
@@ -527,42 +590,35 @@ export class GameAnimations {
 		selectedText.alpha = 1;
 		
 		otherText.visible = false;
-		
-		setTimeout(() => {
+		const turboLevel = this._gamerenderer ? this._gamerenderer.turboLevel : 0;
+		const moveDelay = GameConstants.getWildMoveDelay(turboLevel);
+		this.scheduleDelay(moveDelay, () => {
 			const targetX = selectedText.x;
-			const targetY = this.frameSprite.y; 
-			
+			const targetY = this.frameSprite.y;
 			const startX = selectedText.x;
 			const startY = selectedText.y;
-			const turboLevel = this._gamerenderer ? this._gamerenderer.turboLevel : 0;
-			const duration = GameConstants.getWildMoveDuration(turboLevel); 
-			const startTime = Date.now();
-			
-			const animate = () => {
-				const elapsed = Date.now() - startTime;
+			const duration = GameConstants.getWildMoveDuration(turboLevel);
+			const scaleBoost = this.effectQualityTier === 2 ? 0.2 : 0.5;
+			let elapsed = 0;
+			this.scheduleManaged((frame) => {
+				elapsed += frame.deltaMS;
 				const progress = Math.min(elapsed / duration, 1);
-				
 				const easeOut = 1 - Math.pow(1 - progress, 3);
-				
 				selectedText.x = startX + (targetX - startX) * easeOut;
 				selectedText.y = startY + (targetY - startY) * easeOut;
-			
-				selectedText.scale.set(1 + 0.5 * easeOut);
-				
+				selectedText.scale.set(1 + scaleBoost * easeOut);
 				if (progress < 1) {
-					requestAnimationFrame(animate);
-				} else {
-					const finalDelay = turboLevel === 2 ? 40 : turboLevel === 1 ? 60 : 100;
-					setTimeout(() => {
-						if (onComplete) {
-							onComplete();
-						}
-					}, finalDelay);
+					return true;
 				}
-			};
-			
-			animate();
-		}, GameConstants.getWildMoveDelay(this._gamerenderer ? this._gamerenderer.turboLevel : 0));
+				const finalDelay = turboLevel === 2 ? 40 : turboLevel === 1 ? 60 : 100;
+				this.scheduleDelay(finalDelay, () => {
+					if (onComplete) {
+						onComplete();
+					}
+				});
+				return false;
+			});
+		});
 	}
 
 	public playPaylineAnimations(winDetails: WinDetail[], wildPositions?: WildPosition[], onComplete?: () => void): void {
@@ -609,13 +665,13 @@ export class GameAnimations {
 		});
 
 		winDetails.forEach((winDetail, index) => {
-			setTimeout(() => {
+			this.scheduleDelay(index * animationDelay, () => {
 				if (winDetail.isGrouped) {
 					this.drawGroupedPayline(winDetail, index === winDetails.length - 1, wildPositions, onComplete, winAmounts.get(index) || 0);
 				} else {
 					this.drawQuickPayline(winDetail, index === winDetails.length - 1, wildPositions, onComplete, winAmounts.get(index) || 0);
 				}
-			}, index * animationDelay);
+			});
 		});
 	}
 
@@ -669,7 +725,7 @@ export class GameAnimations {
 				if (isLastPayline) {
 					const isSuperTurbo = this._gamerenderer && this._gamerenderer.turboLevel === 2;
 					const finalDelay = isSuperTurbo ? 15 : 200;
-					setTimeout(() => {
+					this.scheduleDelay(finalDelay, () => {
 						this.isPaylineAnimationsPlaying = false;
 						if (this._gamerenderer) {
 							const reelAmountmoney = (this._gamerenderer.amount / this.client.minAmountCredit) * this.client.minCreditCurrency;
@@ -679,7 +735,7 @@ export class GameAnimations {
 							}
 						}
 						if (onComplete) onComplete();
-					}, finalDelay);
+					});
 				}
 			}, preCalculatedWinAmount);
 		});
@@ -759,7 +815,7 @@ export class GameAnimations {
 		let winText: Text | null = null;
 		try {
 			winText = this.acquireText();
-			winText.text = `${realBalanceWin.toFixed(2)} $`;
+			winText.text = this.formatMoney(realBalanceWin);
 			winText.style = winTextStyle;
 			winText.anchor.set(0.5);
 			winText.x = avgX;
@@ -781,34 +837,34 @@ export class GameAnimations {
 		let holdDuration = GameConstants.getPaylineHold(turboLevel);
 		let fadeOutDuration = GameConstants.getPaylineFadeOut(turboLevel);
 
-		const startTime = Date.now();
-		const animate = () => {
-			if (!winText) return;
+		let elapsed = 0;
+		this.scheduleManaged((frame) => {
+			if (!winText) return false;
+			elapsed += frame.deltaMS;
 			
 			if (this._gamerenderer && this._gamerenderer.turboLevel === 2) {
 				fadeInDuration = Math.min(fadeInDuration, 60);
 				holdDuration = Math.min(holdDuration, 100);
 				fadeOutDuration = Math.min(fadeOutDuration, 60);
 			}
-			const elapsed = Date.now() - startTime;
 			if (elapsed < fadeInDuration) {
 				const p = elapsed / fadeInDuration;
 				winText.alpha = p; winText.scale.set(0.5 + 0.5 * p);
-				requestAnimationFrame(animate);
+				return true;
 			} else if (elapsed < fadeInDuration + holdDuration) {
 				winText.alpha = 1; winText.scale.set(1);
-				requestAnimationFrame(animate);
+				return true;
 			} else if (elapsed < fadeInDuration + holdDuration + fadeOutDuration) {
 				const p = (elapsed - fadeInDuration - holdDuration) / fadeOutDuration;
 				winText.alpha = 1 - p;
-				requestAnimationFrame(animate);
+				return true;
 			} else {
 				if (winText.parent) this.fxText.removeChild(winText);
 				this.releaseText(winText);
 				if (onComplete) onComplete();
+				return false;
 			}
-		};
-		requestAnimationFrame(animate);
+		});
 	}
 
 	public playBigWinAnimation(winAmount: number, onComplete?: () => void, isBonus: boolean = false): void {
@@ -845,7 +901,7 @@ export class GameAnimations {
 		});
 		
 		this.bigWinText = this.acquireText();
-		this.bigWinText.text = `0.00 $`;
+		this.bigWinText.text = this.formatMoney(0);
 		this.bigWinText.style = bigWinTextStyle;
 		this.bigWinText.anchor.set(0.5);
 		this.bigWinText.x = this.app.screen.width / 2;
@@ -858,7 +914,7 @@ export class GameAnimations {
 		
 		
 		let currentTitle = this.acquireText();
-		currentTitle.text = 'WIN';
+		currentTitle.text = this.getBigWinTitleText("win");
 		currentTitle.style = new TextStyle({
 				fontFamily: GameConstants.FONTS.DEFAULT,
 				fontSize: scalePx(GameConstants.FONTS.SIZE_XXL, this.app.screen.width, this.app.screen.height),
@@ -894,37 +950,43 @@ export class GameAnimations {
 		const fadeOutDuration = GameConstants.BIG_WIN_ANIMATION.FADE_OUT_DURATION;
 		
 		let currentAmount = 0;
+		let currentTitleStage: "win" | "big" | "mega" | "superMega" | "epic" | "max" = "win";
 		let animationPhase = 'overlay';
-		let fadeOutStartTime = 0; 
-		let holdStartTime = 0; 
-		const startTime = Date.now();
+		let fadeOutElapsed = 0;
+		let holdElapsed = 0;
+		let totalElapsed = 0;
+		let milestoneElapsed = 0;
 		let CSkip = 0;
 		
-		const animate = () => {
+		this.scheduleManaged((frame) => {
 			if (!this.isBigWinAnimationPlaying) {
 				this.clearBigWinAnimation();
 				if (onComplete) onComplete();
-				return;
+				return false;
 			}
 			this.ensureBigWinOnTop();
+			totalElapsed += frame.deltaMS;
 			
-			const elapsed = Date.now() - startTime;
-			
-			if (animationPhase === 'overlay' && elapsed >= overlayFadeDuration) {
+			if (animationPhase === 'overlay' && totalElapsed >= overlayFadeDuration) {
 				animationPhase = 'fadeIn';
-			} else if (animationPhase === 'fadeIn' && elapsed >= overlayFadeDuration + textFadeInDuration) {
+			} else if (animationPhase === 'fadeIn' && totalElapsed >= overlayFadeDuration + textFadeInDuration) {
 				animationPhase = 'countUp';
+				milestoneElapsed = 0;
 			} else if (animationPhase === 'countUp' && currentAmount >= winAmount) {
 				animationPhase = 'hold';
-				holdStartTime = Date.now(); 
+				holdElapsed = 0;
 				currentAmount = winAmount;
-			} else if (animationPhase === 'hold' && holdStartTime > 0 && (Date.now() - holdStartTime) >= holdDuration) {
-				
+			} else if (animationPhase === 'hold') {
+				holdElapsed += frame.deltaMS;
+				if (holdElapsed < holdDuration) {
+					// continue hold until timeout
+				} else {
 				animationPhase = 'fadeOut';
-				fadeOutStartTime = Date.now();
+					fadeOutElapsed = 0;
+				}
 			}
 			if (animationPhase === 'overlay') {
-				const progress = elapsed / overlayFadeDuration;
+				const progress = totalElapsed / overlayFadeDuration;
 				if (this.bigWinOverlay) {
 					this.bigWinOverlay.clear();
 					this.bigWinOverlay.rect(0, 0, this.app.screen.width, this.app.screen.height);
@@ -932,7 +994,7 @@ export class GameAnimations {
 				}
 			}
 			else if (animationPhase === 'fadeIn') {
-				const progress = (elapsed - overlayFadeDuration) / textFadeInDuration;
+				const progress = (totalElapsed - overlayFadeDuration) / textFadeInDuration;
 				const easeOut = 1 - Math.pow(1 - progress, 3);
 				
 				if (currentTitle) {
@@ -968,17 +1030,18 @@ export class GameAnimations {
 						
 						this.lastMilestone = nextMilestone;
 						this.isMilestoneAnimating = true;
-						this.milestoneAnimationStartTime = Date.now();
+						milestoneElapsed = 0;
 					} else if (currentMilestoneIndex === milestones.length - 1 || currentMultiplierValue >= 15000) {
 						
 						currentAmount = winAmount;
 						animationPhase = 'hold';
+						holdElapsed = 0;
 					} else {
 						
 						currentAmount = Math.min((25 / maxMultiplier) * winAmount, winAmount);
 						this.lastMilestone = 25;
 						this.isMilestoneAnimating = true;
-						this.milestoneAnimationStartTime = Date.now();
+						milestoneElapsed = 0;
 					}
 					
 					this.clickToSkip = false;
@@ -987,11 +1050,12 @@ export class GameAnimations {
 				
 				
 				if (this.isMilestoneAnimating) {
-					const milestoneElapsed = Date.now() - this.milestoneAnimationStartTime;
 					const milestoneDuration = GameConstants.BIG_WIN_ANIMATION.MILESTONE_ANIMATION_DURATION; 
+					milestoneElapsed += frame.deltaMS;
 					
 					if (milestoneElapsed >= milestoneDuration) {
 						this.isMilestoneAnimating = false;
+						milestoneElapsed = 0;
 					}
 				} else {
 					
@@ -1012,7 +1076,7 @@ export class GameAnimations {
 								if (this.lastMilestone < nextMilestone) {
 									this.lastMilestone = nextMilestone;
 									this.isMilestoneAnimating = true;
-									this.milestoneAnimationStartTime = Date.now();
+									milestoneElapsed = 0;
 								}
 							} else {
 								if (currentMultiplierValue < 25) {
@@ -1045,32 +1109,37 @@ export class GameAnimations {
 				
 				const updatedMultiplierValue = (currentAmount / winAmount) * maxMultiplier;
 				
-				if (updatedMultiplierValue >= GameConstants.BIG_WIN_THRESHOLD && currentTitle.text === 'WIN') {
-					this.updateWinTitle(currentTitle, 'BIG WIN', GameConstants.COLORS.RED);
-				} else if (updatedMultiplierValue >= GameConstants.MEGA_WIN_THRESHOLD && currentTitle.text === 'BIG WIN') {
-					this.updateWinTitle(currentTitle, 'MEGA WIN', GameConstants.COLORS.ORANGE_BRIGHT);
-				} else if (updatedMultiplierValue >= GameConstants.SUPER_MEGA_WIN_THRESHOLD && currentTitle.text === 'MEGA WIN') {
-					this.updateWinTitle(currentTitle, 'SUPER MEGA WIN', GameConstants.COLORS.GREEN);
-				} else if (updatedMultiplierValue >= GameConstants.EPIC_WIN_THRESHOLD && currentTitle.text === 'SUPER MEGA WIN') {
-					this.updateWinTitle(currentTitle, 'EPIC WIN', GameConstants.COLORS.PURPLE);
-				} else if (updatedMultiplierValue >= GameConstants.MAX_WIN_THRESHOLD && currentTitle.text === 'EPIC WIN') {
-					this.updateWinTitle(currentTitle, 'MAX WIN', GameConstants.COLORS.PINK);
+				if (updatedMultiplierValue >= GameConstants.BIG_WIN_THRESHOLD && currentTitleStage === "win") {
+					currentTitleStage = "big";
+					this.updateWinTitle(currentTitle, this.getBigWinTitleText("big"), GameConstants.COLORS.RED);
+				} else if (updatedMultiplierValue >= GameConstants.MEGA_WIN_THRESHOLD && currentTitleStage === "big") {
+					currentTitleStage = "mega";
+					this.updateWinTitle(currentTitle, this.getBigWinTitleText("mega"), GameConstants.COLORS.ORANGE_BRIGHT);
+				} else if (updatedMultiplierValue >= GameConstants.SUPER_MEGA_WIN_THRESHOLD && currentTitleStage === "mega") {
+					currentTitleStage = "superMega";
+					this.updateWinTitle(currentTitle, this.getBigWinTitleText("superMega"), GameConstants.COLORS.GREEN);
+				} else if (updatedMultiplierValue >= GameConstants.EPIC_WIN_THRESHOLD && currentTitleStage === "superMega") {
+					currentTitleStage = "epic";
+					this.updateWinTitle(currentTitle, this.getBigWinTitleText("epic"), GameConstants.COLORS.PURPLE);
+				} else if (updatedMultiplierValue >= GameConstants.MAX_WIN_THRESHOLD && currentTitleStage === "epic") {
+					currentTitleStage = "max";
+					this.updateWinTitle(currentTitle, this.getBigWinTitleText("max"), GameConstants.COLORS.PINK);
 				}
 				
 				if (this.bigWinText) {
-					this.bigWinText.text = `${currentAmount.toFixed(2)} $`;
+					this.bigWinText.text = this.formatMoney(currentAmount);
 					this.bigWinText.alpha = 1;
 					if (this.isMilestoneAnimating) {
-						const milestoneElapsed = Date.now() - this.milestoneAnimationStartTime;
 						const animationProgress = milestoneElapsed / 800; 
 						
 						if (animationProgress < 0.4) {
 							const scaleProgress = animationProgress / 0.4;
-							const scale = 1.0 + (0.3 * scaleProgress);
+							const scale = 1.0 + ((this.effectQualityTier === 2 ? 0.15 : 0.3) * scaleProgress);
 							this.bigWinText.scale.set(scale);
 						} else if (animationProgress < 1.0) {
 							const scaleProgress = (animationProgress - 0.4) / 0.6;
-							const scale = 1.3 - (0.3 * scaleProgress);
+							const peakScale = this.effectQualityTier === 2 ? 1.15 : 1.3;
+							const scale = peakScale - ((peakScale - 1.0) * scaleProgress);
 							this.bigWinText.scale.set(Math.max(scale, 1.0));
 						} else {
 							this.bigWinText.scale.set(1.0);
@@ -1078,7 +1147,8 @@ export class GameAnimations {
 					} else {
 						this.bigWinText.scale.set(1.0);
 					}
-					const shake = Math.sin(elapsed * 0.1) * 1;
+					const shakeAmount = this.effectQualityTier === 0 ? 1 : this.effectQualityTier === 1 ? 0.4 : 0;
+					const shake = Math.sin(totalElapsed * 0.1) * shakeAmount;
 					this.bigWinText.x = this.app.screen.width / 2 + shake;
 					this.bigWinText.y = this.app.screen.height / 2 + 50 + shake * 0.5;
 				}
@@ -1092,7 +1162,7 @@ export class GameAnimations {
 			else if (animationPhase === 'hold') {
 				if (this.clickToSkip) {
 					animationPhase = 'fadeOut';
-					fadeOutStartTime = Date.now(); 
+					fadeOutElapsed = 0;
 					this.clickToSkip = false;
 				}
 				
@@ -1104,7 +1174,7 @@ export class GameAnimations {
 				}
 				
 				if (this.bigWinText) {
-					this.bigWinText.text = `${winAmount.toFixed(2)} $`;
+					this.bigWinText.text = this.formatMoney(winAmount);
 					this.bigWinText.alpha = 1;
 					this.bigWinText.scale.set(1);
 					this.bigWinText.x = this.app.screen.width / 2;
@@ -1112,17 +1182,8 @@ export class GameAnimations {
 				}
 			}
 			else if (animationPhase === 'fadeOut') {
-				
-				let fadeProgress;
-				if (fadeOutStartTime > 0) {
-					
-					const fadeElapsed = Date.now() - fadeOutStartTime;
-					fadeProgress = fadeElapsed / fadeOutDuration;
-				} else {
-					
-					fadeProgress = (elapsed - overlayFadeDuration - textFadeInDuration - GameConstants.BIG_WIN_ANIMATION.COUNT_UP_DURATION - holdDuration) / fadeOutDuration;
-				}
-				
+				fadeOutElapsed += frame.deltaMS;
+				const fadeProgress = fadeOutElapsed / fadeOutDuration;
 				const fadeAlpha = Math.max(0, 1 - fadeProgress);
 				
 				if (this.bigWinOverlay && !isBonus) {
@@ -1145,14 +1206,11 @@ export class GameAnimations {
 					
 					try { if (this._gamerenderer?.gameInfo?.gameSound !== false) soundManager.play('win', { volume: 0.5 }); } catch {}
 					if (onComplete) onComplete();
-					return;
+					return false;
 				}
 			}
-			requestAnimationFrame(animate);
-		};
-		
-		
-		requestAnimationFrame(animate);
+			return true;
+		});
 	}
 	
 	private updateWinTitle(titleText: Text, newTitle: string, newColor: number): void {
@@ -1164,10 +1222,9 @@ export class GameAnimations {
 		titleText.scale.set(1.3);
 		
 		const scaleBackDuration = 300;
-		const startTime = Date.now();
-	
-		const scaleBack = () => {
-			const elapsed = Date.now() - startTime;
+		let elapsed = 0;
+		this.scheduleManaged((frame) => {
+			elapsed += frame.deltaMS;
 			const progress = Math.min(elapsed / scaleBackDuration, 1);
 			
 			const scale = 1.3 - (0.3 * progress);
@@ -1175,11 +1232,10 @@ export class GameAnimations {
 				titleText.scale.set(scale);
 			
 			if (progress < 1) {
-				requestAnimationFrame(scaleBack);
+				return true;
 			}
-		};
-		
-		requestAnimationFrame(scaleBack);
+			return false;
+		});
 	}
 
 	public playSlowDetailedPaylineAnimation(): void {
@@ -1216,9 +1272,9 @@ export class GameAnimations {
 			if (!this.isSlowDetailedAnimationPlaying) {
 				return;
 			}
-			setTimeout(() => {
+			this.scheduleDelay(1000, () => {
 				this.playStoredWinDetailsSlowly(index + 1);
-			}, 1000);
+			});
 		});
 	}
 
@@ -1358,7 +1414,7 @@ export class GameAnimations {
 		const isGroupedWin = winDetail.isGrouped && winDetail.groupedMatches && winDetail.groupedMatches.length >= 3;
 		
 		if (isGroupedWin) {
-			const resultText = new Text({ text: `${realBalanceWin.toFixed(2)}$`, style: winTextStyle });
+			const resultText = new Text({ text: this.formatMoney(realBalanceWin), style: winTextStyle });
 			resultText.anchor.set(0.5);
 			resultText.x = centerX;
 			resultText.y = centerY;
@@ -1366,38 +1422,38 @@ export class GameAnimations {
 			this.container.addChild(resultText);
 			resultText.zIndex = 200;
 
-			const resultStartTime = Date.now();
-			const animateResultOnly = () => {
-				const elapsed = Date.now() - resultStartTime;
+			let elapsed = 0;
+			this.scheduleManaged((frame) => {
+				elapsed += frame.deltaMS;
 				if (!this.isSlowDetailedAnimationPlaying) {
 					if (resultText.parent) this.container.removeChild(resultText);
 					resultText.destroy();
 					if (onComplete) onComplete();
-					return;
+					return false;
 				}
 				if (elapsed < fadeInDuration) {
 					const p = elapsed / fadeInDuration;
 					resultText.alpha = p;
 					resultText.scale.set(0.5 + 0.5 * p);
-					requestAnimationFrame(animateResultOnly);
+					return true;
 				} else if (elapsed < fadeInDuration + holdDuration) {
 					resultText.alpha = 1;
 					resultText.scale.set(1);
-					requestAnimationFrame(animateResultOnly);
+					return true;
 				} else if (elapsed < fadeInDuration + holdDuration + fadeOutDuration) {
 					const p = (elapsed - fadeInDuration - holdDuration) / fadeOutDuration;
 					resultText.alpha = 1 - p;
-					requestAnimationFrame(animateResultOnly);
+					return true;
 				} else {
 					if (resultText.parent) this.container.removeChild(resultText);
 					resultText.destroy();
 					if (onComplete) onComplete();
+					return false;
 				}
-			};
-			requestAnimationFrame(animateResultOnly);
+			});
 			return;
 		} else {
-			const resultText = new Text({ text: `${realBalanceWin.toFixed(2)}$`, style: winTextStyle });
+			const resultText = new Text({ text: this.formatMoney(realBalanceWin), style: winTextStyle });
 			resultText.anchor.set(0.5);
 			resultText.x = centerX;
 			resultText.y = centerY;
@@ -1405,35 +1461,35 @@ export class GameAnimations {
 			this.container.addChild(resultText);
 			resultText.zIndex = 200;
 
-			const resultStartTime = Date.now();
-			const animateResultOnly = () => {
-				const elapsed = Date.now() - resultStartTime;
+			let elapsed = 0;
+			this.scheduleManaged((frame) => {
+				elapsed += frame.deltaMS;
 				if (!this.isSlowDetailedAnimationPlaying) {
 					if (resultText.parent) this.container.removeChild(resultText);
 					resultText.destroy();
 					if (onComplete) onComplete();
-					return;
+					return false;
 				}
 				if (elapsed < fadeInDuration) {
 					const p = elapsed / fadeInDuration;
 					resultText.alpha = p;
 					resultText.scale.set(0.5 + 0.5 * p);
-					requestAnimationFrame(animateResultOnly);
+					return true;
 				} else if (elapsed < fadeInDuration + holdDuration) {
 					resultText.alpha = 1;
 					resultText.scale.set(1);
-					requestAnimationFrame(animateResultOnly);
+					return true;
 				} else if (elapsed < fadeInDuration + holdDuration + fadeOutDuration) {
 					const p = (elapsed - fadeInDuration - holdDuration) / fadeOutDuration;
 					resultText.alpha = 1 - p;
-					requestAnimationFrame(animateResultOnly);
+					return true;
 				} else {
 					if (resultText.parent) this.container.removeChild(resultText);
 					resultText.destroy();
 					if (onComplete) onComplete();
+					return false;
 				}
-			};
-			requestAnimationFrame(animateResultOnly);
+			});
 			return;
 		}
 	}
@@ -1466,8 +1522,8 @@ export class GameAnimations {
 	): void {
 		let animationProgress = 0;
 		const animationSpeed = this._gamerenderer?.turboLevel == 2 ? 16 : 8; 
-		const snakeLength = 3; 
-		const tailFadeLength = 1.5;
+		const snakeLength = this.effectQualityTier === 2 ? 2.2 : 3;
+		const tailFadeLength = this.effectQualityTier === 0 ? 1.5 : 1.1;
 
 		
 		const perPath = paths.map((coords) => {
@@ -1483,11 +1539,11 @@ export class GameAnimations {
 			return { coords, segs, total };
 		});
 
-		const animate = () => {
+		this.scheduleManaged((frame) => {
 			if (this.isSlowDetailedAnimationPlaying === false && detailedWidth) {
 				if (paylineGraphic.parent) this.container.removeChild(paylineGraphic);
 				paylineGraphic.destroy();
-				return;
+				return false;
 			}
 			paylineGraphic.clear();
 			for (const p of perPath) {
@@ -1529,10 +1585,12 @@ export class GameAnimations {
 				if (pathPoints.length >= 2) {
 					paylineGraphic.moveTo(pathPoints[0].x, pathPoints[0].y);
 					for (let i = 1; i < pathPoints.length; i++) paylineGraphic.lineTo(pathPoints[i].x, pathPoints[i].y);
-					const avgAlpha = pathPoints.reduce((s, pt) => s + pt.alpha, 0) / pathPoints.length;
+					const avgAlpha = this.effectQualityTier === 2 ? 0.9 : pathPoints.reduce((s, pt) => s + pt.alpha, 0) / pathPoints.length;
 					paylineGraphic.stroke({
 						color: GameConstants.COLORS.GOLD,
-						width: detailedWidth ? GameConstants.PAYLINE_ANIMATION.STROKE_WIDTH_DETAILED : GameConstants.PAYLINE_ANIMATION.STROKE_WIDTH,
+						width: detailedWidth
+							? Math.max(4, GameConstants.PAYLINE_ANIMATION.STROKE_WIDTH_DETAILED - this.effectQualityTier * 2)
+							: Math.max(3, GameConstants.PAYLINE_ANIMATION.STROKE_WIDTH - this.effectQualityTier),
 						alpha: avgAlpha,
 						cap: 'round',
 						join: 'round'
@@ -1540,15 +1598,15 @@ export class GameAnimations {
 				}
 			}
 
-			animationProgress += animationSpeed;
+			animationProgress += animationSpeed * (frame.deltaRatio ?? 1);
 			const totalAnimationTime = 100 + snakeLength * 20;
 			if (animationProgress < totalAnimationTime) {
-				requestAnimationFrame(animate);
+				return true;
 			} else {
 				onComplete();
+				return false;
 			}
-		};
-		requestAnimationFrame(animate);
+		});
 	}
 
 	public accelerateAnimations(): void {
@@ -1605,7 +1663,7 @@ export class GameAnimations {
 		
 		
 		validWinDetails.forEach((winDetail, index) => {
-			setTimeout(() => {
+			this.scheduleDelay(index * 30, () => {
 				this.drawQuickFreespinPayline(winDetail, () => {
 					completedAnimations++;
 					if (completedAnimations >= validWinDetails.length) {
@@ -1613,7 +1671,7 @@ export class GameAnimations {
 						if (onComplete) onComplete();
 					}
 				});
-			}, index * 30); 
+			}); 
 		});
 	}
 	
@@ -1633,7 +1691,7 @@ export class GameAnimations {
 			const realBalanceWin = (baseWinAmount / this.client.minAmountCredit) * this.client.minCreditCurrency;
 			
 			const winText = new Text({
-				text: `+${GameConstants.currency}${realBalanceWin.toFixed(2)}`,
+				text: `+${this.formatMoney(realBalanceWin)}`,
 				style: {
 					fontFamily: 'Arial',
 					fontSize: 24,
@@ -1652,30 +1710,30 @@ export class GameAnimations {
 			this.container.addChild(winText);
 			winText.zIndex = 200; 
 			
-			const fadeIn = () => {
-				winText.alpha = Math.min(winText.alpha + 0.1, 1);
+			this.scheduleManaged((frame) => {
+				const fadeStep = this.effectQualityTier === 2 ? 0.2 : 0.1;
+				winText.alpha = Math.min(winText.alpha + fadeStep * frame.deltaRatio, 1);
 				if (winText.alpha < 1) {
-					requestAnimationFrame(fadeIn);
+					return true;
 				} else {
-					
-					setTimeout(() => {
-						const fadeOut = () => {
-							winText.alpha = Math.max(winText.alpha - 0.1, 0);
+					this.scheduleDelay(300, () => {
+						this.scheduleManaged((fadeFrame) => {
+							winText.alpha = Math.max(winText.alpha - fadeStep * fadeFrame.deltaRatio, 0);
 							if (winText.alpha > 0) {
-								requestAnimationFrame(fadeOut);
+								return true;
 							} else {
 								if (winText.parent) {
 									this.container.removeChild(winText);
 								}
 								winText.destroy();
 								if (onComplete) onComplete();
+								return false;
 							}
-						};
-						requestAnimationFrame(fadeOut);
-					}, 300);
+						});
+					});
+					return false;
 				}
-			};
-			requestAnimationFrame(fadeIn);
+			});
 		} else {
 			if (onComplete) onComplete();
 		}

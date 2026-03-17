@@ -150,6 +150,15 @@ export class GameConstants {
         MIN_FPS: 60,
         MAX_FPS: 120
     } as const;
+
+    public static readonly PERFORMANCE = {
+        FRAME_MS_60FPS: 1000 / 60,
+        DESKTOP_SAMPLE_SIZE: 8,
+        DESKTOP_DEGRADE_FPS: 57,
+        DESKTOP_MINIMAL_FPS: 52,
+        DESKTOP_RECOVER_REDUCED_FPS: 59,
+        DESKTOP_RECOVER_FULL_FPS: 60
+    } as const;
     
     
     public static readonly SCREEN = {
@@ -320,6 +329,10 @@ export class GameConstants {
     }
     public static getRefHeight(): number {
         return this.IS_MOBILE ? this.MOBILE_SCREEN.BASE_HEIGHT : this.SCREEN.BASE_HEIGHT;
+    }
+
+    public static toFrameDeltaRatio(deltaMS: number): number {
+        return Math.max(0.25, deltaMS / this.PERFORMANCE.FRAME_MS_60FPS);
     }
 
         

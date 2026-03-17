@@ -7,7 +7,9 @@ import { soundManager } from "./soundManager";
 import { ObjectPool } from "./objPool";
 import { LayoutManager } from "./LayoutManager";
 import { makeHiResCircleSprite } from "./shapeUtils";
+import { formatCurrency, t } from "./i18n";
 
+type MenuItemId = "homepage" | "info" | "sound" | "music" | "superTurbo" | "turbo";
 
 export class gameInfo {
 	
@@ -26,6 +28,7 @@ export class gameInfo {
 	private freespinText: Text | null = null;
 	private freespinLabel: Text | null = null;
 	private totalWinText: Text | null = null;
+	private totalWinLabelText: Text | null = null;
 	private totalWinContainer: Container | null = null;
 	private screenWidth: number;
 	private screenHeight: number;
@@ -71,6 +74,22 @@ export class gameInfo {
 		try { (child as any).label = name; } catch {}
 	}
 
+	private formatMoney(value: number): string {
+		return formatCurrency(value, GameConstants.currency);
+	}
+
+	private getAutoShortLabel(): string {
+		return t("hud.autoShort");
+	}
+
+	private getSpinsRemainingLabel(count: number): string {
+		return t("hud.spinsRemaining", { count });
+	}
+
+	private getMenuLabel(id: MenuItemId): string {
+		return t(`menu.${id}`);
+	}
+
 	
 	private getBottomBarWidth(): number {
 		if (GameConstants.IS_MOBILE) {
@@ -78,6 +97,51 @@ export class gameInfo {
 			return Math.max(0, this.screenWidth - 2 * leftPad);
 		}
 		return this.boxContainer?.width ?? this.screenWidth;
+	}
+
+	private getTextFontSize(text: Text, fallback: number): number {
+		const fontSize = Number((text.style as any)?.fontSize);
+		return Number.isFinite(fontSize) ? fontSize : fallback;
+	}
+
+	private fitTextToWidth(text: Text | null, maxWidth: number, minFontSize: number): void {
+		if (!text || maxWidth <= 0) return;
+		const style = text.style as any;
+		let fontSize = this.getTextFontSize(text, minFontSize);
+		while (text.width > maxWidth && fontSize > minFontSize) {
+			fontSize -= 1;
+			style.fontSize = fontSize;
+		}
+	}
+
+	private layoutTotalWinContainer(): void {
+		if (!this.totalWinContainer || !this.totalWinText || !this.totalWinLabelText) return;
+
+		const containerWidth = GameConstants.IS_MOBILE ? this.getBottomBarWidth() : (this.boxContainer?.width ?? 800);
+		const pad = Math.max(10, Math.floor(this.screenWidth * 0.03));
+		const baseWidth = scalePx(100, this.screenWidth, this.screenHeight) * this.MOBILE_UI_SCALE;
+		let panelWidth = baseWidth;
+
+		if (GameConstants.IS_MOBILE) {
+			const preferredWidth = Math.max(
+				baseWidth,
+				Math.ceil(Math.max(this.totalWinLabelText.width, this.totalWinText.width) + 24),
+			);
+			const maxWidth = Math.max(baseWidth, Math.floor(containerWidth * 0.34));
+			panelWidth = Math.min(preferredWidth, maxWidth);
+		}
+
+		(this.totalWinContainer as any)._panelWidth = panelWidth;
+		this.totalWinLabelText.x = panelWidth / 2;
+		this.totalWinText.x = panelWidth / 2;
+		this.fitTextToWidth(this.totalWinLabelText, panelWidth - 16, GameConstants.IS_MOBILE ? 10 : 12);
+		this.fitTextToWidth(this.totalWinText, panelWidth - 16, GameConstants.IS_MOBILE ? 12 : 14);
+
+		if (GameConstants.IS_MOBILE) {
+			this.totalWinContainer.x = (this.boxContainer?.x ?? 0) + containerWidth - panelWidth - pad;
+		} else {
+			this.totalWinContainer.x = containerWidth - panelWidth - scalePx(80, this.screenWidth, this.screenHeight);
+		}
 	}
 
 	constructor(client:GameClient, assetLoader: AssetLoader, screenWidth: number = 1920, screenHeight = 1080) {
@@ -123,7 +187,7 @@ export class gameInfo {
 	this.boxContainer.y = screenHeight - boxHeight - bottomMargin;
 	const labelBoost = GameConstants.IS_MOBILE ? 1.3 : 1.0;
 		this.balanceLabel = new Text({
-			text: "BALANCE",
+			text: t("hud.balance"),
 			style: {
 				fontFamily: GameConstants.FONTS.DEFAULT,
 		fontSize: GameConstants.FONTS.SIZE_SMALL * this.MOBILE_UI_SCALE * labelBoost,
@@ -132,12 +196,12 @@ export class gameInfo {
 			}
 		});
 		if (this._client.isDemo)
-			this.balanceLabel.text = "DEMO BALANCE";
+			this.balanceLabel.text = t("hud.demoBalance");
 		this.balanceLabel.x = 12;
 		this.balanceLabel.y = boxHeight  / 4;
 		this.boxContainer.addChild(this.balanceLabel);
 		
-		const BalanceT = `${GameConstants.currency}${balance.toLocaleString("tr-TR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+		const BalanceT = this.formatMoney(balance);
 		let fSize = 0;
 		if (BalanceT.length >= 11)
 			fSize = BalanceT.length % 11;
@@ -160,7 +224,7 @@ export class gameInfo {
 		this.boxContainer.addChild(this.balanceText);
 		
 	this.betLabel = new Text({
-			text: "BET",
+			text: t("hud.bet"),
 			style: {
 				fontFamily: GameConstants.FONTS.DEFAULT,
 		fontSize: GameConstants.FONTS.SIZE_SMALL * this.MOBILE_UI_SCALE * labelBoost,
@@ -174,7 +238,7 @@ export class gameInfo {
 		
 	const betBaseSize = GameConstants.IS_MOBILE ? 32 : 24;
 	this.betText = new Text({
-			text: `${GameConstants.currency}${bet.toFixed(2).replace(".", ",")}`,
+			text: this.formatMoney(bet),
 			style: {
 				fontFamily: "Arial",
 		fontSize: betBaseSize * this.MOBILE_UI_SCALE,
@@ -256,10 +320,7 @@ export class gameInfo {
 			try { this.boxContainer.removeChild(this.winTitle); } catch {}
 			this.winTitle.destroy();
 		}
-		const WText = `${GameConstants.currency}${win.toLocaleString("tr-TR", {
-			minimumFractionDigits: 2,
-			maximumFractionDigits: 2
-		})}`;
+		const WText = this.formatMoney(win);
 		let fSize = 0;
 		if (WText.length >= 8)
 		 	fSize = WText.length % 8;
@@ -277,7 +338,7 @@ export class gameInfo {
 		});
 
 		this.winTitle = new Text({
-			text: `WIN`,
+			text: t("hud.win"),
 			style: {
 				fontFamily: "Arial",
 				fontSize: baseTitleFont,
@@ -298,6 +359,9 @@ export class gameInfo {
 			
 			const innerWidth = this.getBottomBarWidth();
 			const padRight = Math.max(8, Math.floor(this.screenWidth * 0.03));
+			const maxTextWidth = Math.max(72, innerWidth - startX - padRight);
+			this.fitTextToWidth(this.winTitle, maxTextWidth, 12);
+			this.fitTextToWidth(this.winText, maxTextWidth, 14);
 			
 			this.winTitle.x = startX;
 			this.winText.x = startX;
@@ -505,8 +569,8 @@ export class gameInfo {
 		const buttonWidth = scalePx(100, this.screenWidth, this.screenHeight) * this.MOBILE_UI_SCALE;
 		const buttonHeight = scalePx(90, this.screenWidth, this.screenHeight) * this.MOBILE_UI_SCALE;
 		
-		const totalWinLabel = new Text({
-			text: "TOTAL WIN",
+		this.totalWinLabelText = new Text({
+			text: t("hud.totalWin"),
 			style: {
 				fontFamily: GameConstants.FONTS.DEFAULT,
 				fontSize: scalePx(16, this.screenWidth, this.screenHeight) * this.MOBILE_UI_SCALE,
@@ -515,12 +579,12 @@ export class gameInfo {
 				align: 'center'
 			}
 		});
-		totalWinLabel.anchor.set(0.5);
-		totalWinLabel.x = buttonWidth / 2;
-		totalWinLabel.y = buttonHeight / 2 - 20;
+		this.totalWinLabelText.anchor.set(0.5);
+		this.totalWinLabelText.x = buttonWidth / 2;
+		this.totalWinLabelText.y = buttonHeight / 2 - 20;
 
 		this.totalWinText = new Text({
-			text: `${GameConstants.currency}${this.currentTotalWin.toLocaleString("tr-TR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`,
+			text: this.formatMoney(this.currentTotalWin),
 			style: {
 				fontFamily: GameConstants.FONTS.DEFAULT,
 				fontSize: scalePx(20, this.screenWidth, this.screenHeight) * this.MOBILE_UI_SCALE,
@@ -533,18 +597,10 @@ export class gameInfo {
 		this.totalWinText.x = buttonWidth / 2;
 		this.totalWinText.y = buttonHeight / 2 + 10;
 		
-		this.totalWinContainer.addChild(totalWinLabel);
+		this.totalWinContainer.addChild(this.totalWinLabelText);
 		this.totalWinContainer.addChild(this.totalWinText);
 
-		{
-			const containerWidth = GameConstants.IS_MOBILE ? this.getBottomBarWidth() : (this.boxContainer?.width ?? 800);
-			if (GameConstants.IS_MOBILE) {
-				const pad = Math.max(10, Math.floor(this.screenWidth * 0.03));
-				this.totalWinContainer.x = (this.boxContainer?.x ?? 0) + containerWidth - buttonWidth - pad; 
-			} else {
-				this.totalWinContainer.x = containerWidth - buttonWidth - scalePx(80, this.screenWidth, this.screenHeight);
-			}
-		}
+		this.layoutTotalWinContainer();
 		
 		{
 			const barHeight = scalePx(100, this.screenWidth, this.screenHeight) * this.MOBILE_UI_SCALE;
@@ -558,22 +614,12 @@ export class gameInfo {
 		this.currentTotalWin = amount;
 
 		if (this.totalWinText) {
-			this.totalWinText.text = `${GameConstants.currency}${amount.toLocaleString("tr-TR", { 
-				minimumFractionDigits: 2, 
-				maximumFractionDigits: 2 
-			})}`;
-
-			const baseFontSize = 20;
-			const maxLength = 9;
-
-			if (this.totalWinText.text.length > maxLength) {
-				const diff = this.totalWinText.text.length - maxLength;
-				this.totalWinText.style.fontSize = baseFontSize - diff * 2; 
-			} else {
-				this.totalWinText.style.fontSize = baseFontSize;
-			}
+			this.totalWinText.text = this.formatMoney(amount);
+			(this.totalWinText.style as any).fontSize =
+				scalePx(20, this.screenWidth, this.screenHeight) * this.MOBILE_UI_SCALE;
+			this.layoutTotalWinContainer();
 		}
-}
+	}
 
 	public removeTotalWin(): void {
 		if (this.totalWinContainer && this.totalWinContainer.parent) {
@@ -582,17 +628,14 @@ export class gameInfo {
 			this.totalWinContainer = null;
 		}
 		
-		if (this.totalWinText && this.totalWinText.parent) {
-			this.totalWinText.parent.removeChild(this.totalWinText);
-			this.totalWinText.destroy();
-		}
 		this.totalWinText = null;
+		this.totalWinLabelText = null;
 		this.currentTotalWin = 0;
 		
 		if (this.boxContainer && this.boxContainer.children) {
 			for (let i = this.boxContainer.children.length - 1; i >= 0; i--) {
 				const child = this.boxContainer.children[i];
-				if (child instanceof Text && child.text === "TOTAL WIN") {
+				if (child instanceof Text && child.text === t("hud.totalWin")) {
 					this.boxContainer.removeChild(child);
 					child.destroy();
 				}
@@ -621,7 +664,7 @@ export class gameInfo {
 			const currentAmount = startAmount + (displayWin * easeOut);
 			
 			if (this.winText) {
-				this.winText.text = `${GameConstants.currency}${currentAmount.toLocaleString("tr-TR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+				this.winText.text = this.formatMoney(currentAmount);
 				if (isIntenseWin) {
 					const shakeIntensity = 5;
 					this.winText.x = originalX + (Math.random() - 0.5) * shakeIntensity;
@@ -721,7 +764,7 @@ export class gameInfo {
 		const btn = makeHiResCircleSprite(this._client.app, buttonRadius, { fill: 0x000000, fillAlpha: 0.5, stroke: 0xffffff, strokeWidth: 2, ssaa: 3 });
 
 		const bonusText = new Text({
-			text: "BONUS",
+			text: t("hud.bonus"),
 			style: {
 				fontFamily: "Arial",
 				
@@ -764,7 +807,7 @@ export class gameInfo {
 				if (this.betText) {
 					this.betText.style.fill = GameConstants.COLORS.WHITE;
 					const currentBet = this._client.realAmount;
-					this.betText.text = `${GameConstants.currency}${currentBet.toFixed(2).replace('.', ',')}`;
+					this.betText.text = this.formatMoney(currentBet);
 				}
 				return; 
 			}
@@ -864,7 +907,7 @@ export class gameInfo {
 			(betBar as any).zIndex = 50;
 			overlayContainer.addChild(betBar);
 			const betLabel = new Text({
-				text: 'BET',
+				text: t("hud.bet"),
 				style: { fontFamily: GameConstants.FONTS.DEFAULT, fontSize: Math.max(14, Math.floor(barH * 0.32)), fill: 0x000000, fontWeight: 'bold' }
 			});
 			betLabel.anchor.set(0.5);
@@ -873,7 +916,7 @@ export class gameInfo {
 			(betLabel as any).zIndex = 51;
 			overlayContainer.addChild(betLabel);
 			const betTxt = new Text({
-				text: `${GameConstants.currency}${this._client.realAmount.toFixed(2).replace('.', ',')}`,
+				text: this.formatMoney(this._client.realAmount),
 				
 				style: { fontFamily: GameConstants.FONTS.DEFAULT, fontSize: Math.max(14, Math.floor(barH * 0.40)), fill: 0x000000, fontWeight: 'bold' }
 			});
@@ -908,7 +951,7 @@ export class gameInfo {
 						this._client.UpBet();
 					}
 					this.updateBetDisplay();
-					betTxt.text = `${GameConstants.currency}${this._client.realAmount.toFixed(2).replace('.', ',')}`;
+					betTxt.text = this.formatMoney(this._client.realAmount);
 					boxUpdaters.forEach(fn => { try { fn(); } catch {} });
 				};
 			minusBtn.on('pointerdown', (e: any) => { e.stopPropagation?.(); onChangeBet(-1); });
@@ -930,9 +973,22 @@ export class gameInfo {
 		) => {
 			
 			const titleScale = GameConstants.IS_MOBILE ? 1.8 : 1.0;
-			const descScale = GameConstants.IS_MOBILE ? 1.6 : 1.0;
+			const descScale = GameConstants.IS_MOBILE ? 1.35 : 1.0;
 			const amountScale = GameConstants.IS_MOBILE ? 1.8 : 1.0;
 			const ctaTextScale = GameConstants.IS_MOBILE ? 1.6 : 1.0;
+			const buttonHeight = boxHeight / 6;
+			const buttonTop = boxHeight - buttonHeight;
+			const contentTop = GameConstants.IS_MOBILE ? boxHeight * 0.12 : boxHeight * 0.14;
+			const descTop = GameConstants.IS_MOBILE ? boxHeight * 0.21 : boxHeight * 0.23;
+			const descAreaHeight = GameConstants.IS_MOBILE ? boxHeight * 0.14 : boxHeight * 0.12;
+			const imageTop = descTop + descAreaHeight + (GameConstants.IS_MOBILE ? boxHeight * 0.03 : boxHeight * 0.025);
+			const imageSize = Math.min(
+				boxWidth * (GameConstants.IS_MOBILE ? 0.38 : 0.44),
+				GameConstants.IS_MOBILE ? boxHeight * 0.22 : boxHeight * 0.24
+			);
+			const amountBottomGap = GameConstants.IS_MOBILE ? boxHeight * 0.035 : boxHeight * 0.045;
+			const amountCenterY = buttonTop - amountBottomGap;
+			const volatilityY = amountCenterY - (GameConstants.IS_MOBILE ? boxHeight * 0.11 : boxHeight * 0.12);
 			
 			const box = new Container();
 			const boxBg = pool ? pool.acquireGraphics() : new Graphics();
@@ -967,43 +1023,32 @@ export class gameInfo {
 			titleText.visible = true;
 			titleText.anchor.set(0.5);
 			titleText.x = boxWidth / 2;
-			
-			titleText.y = boxHeight / 7;
+			titleText.y = contentTop;
 
 				const descText = acquireText();
 				descText.text = desc;
 				descText.anchor?.set(0.5);
 				(descText.style as any).fontFamily = "Arial";
-			(descText.style as any).fontSize = (scalePx(GameConstants.IS_MOBILE ? 22 : 16, this.screenWidth, this.screenHeight) as number) * descScale as any;
+			(descText.style as any).fontSize = (scalePx(GameConstants.IS_MOBILE ? 18 : 16, this.screenWidth, this.screenHeight) as number) * descScale as any;
 			(descText.style as any).fill = GameConstants.COLORS.BLACK as any;
 			(descText.style as any).align = "center" as any;
 			(descText.style as any).wordWrap = true;
-			(descText.style as any).wordWrapWidth = boxWidth * 0.92;
+			(descText.style as any).wordWrapWidth = boxWidth * 0.8;
 			descText.alpha = 0.75;
 			descText.visible = true;
-			descText.anchor.set(0.5, GameConstants.IS_MOBILE ? 0 : 0.5);
+			descText.anchor.set(0.5, 0);
 			descText.x = boxWidth / 2;
-			if (GameConstants.IS_MOBILE) {
-				const pad = Math.max(8, Math.floor(this.screenHeight * 0.006));
-				descText.y = titleText.y + titleText.height / 2 + pad;
-			} else {
-				descText.y = titleText.y + scalePx(45, this.screenWidth, this.screenHeight);
-			}
+			descText.y = descTop;
 			descText.alpha = 0.75;
 
 			const image = acquireSprite(texture);
-			image.width = boxWidth * (GameConstants.IS_MOBILE ? 0.45 : 0.5);
-			image.height = image.width;
+			image.width = imageSize;
+			image.height = imageSize;
 			image.x = (boxWidth - image.width) / 2;
-			if (GameConstants.IS_MOBILE) {
-				const pad = Math.max(8, Math.floor(this.screenHeight * 0.006));
-				image.y = descText.y + descText.height + pad;
-			} else {
-				image.y = descText.y + descText.height + scalePx(10, this.screenWidth, this.screenHeight);
-			}
+			image.y = imageTop;
 
 				const volatilityText = acquireText();
-				volatilityText.text = `Volatility: Very High`;
+				volatilityText.text = t("bonusBuy.volatilityVeryHigh");
 				volatilityText.anchor?.set(0.5);
 			(volatilityText.style as any).fontFamily = "Arial";
 			(volatilityText.style as any).fontSize = scalePx(GameConstants.IS_MOBILE ? 30 : 16, this.screenWidth, this.screenHeight) as any;
@@ -1011,17 +1056,13 @@ export class gameInfo {
 			(volatilityText.style as any).align = "center" as any;
 			volatilityText.anchor.set(0.5);
 			volatilityText.x = boxWidth / 2;
-			
-			const volPad = GameConstants.IS_MOBILE 
-				? Math.max(16, Math.floor(this.screenHeight * 0.025)) 
-				: scalePx(20, this.screenWidth, this.screenHeight);
-			volatilityText.y = image.y + image.height + volPad;
+			volatilityText.y = volatilityY;
 			volatilityText.alpha = 0.75;
 			
 			volatilityText.visible = true;
 
 				const amountText = acquireText();
-				const makeAmount = () => `${GameConstants.currency}${(this._client.realAmount * priceMultiplier).toFixed(2).replace(".", ",")}`;
+				const makeAmount = () => this.formatMoney(this._client.realAmount * priceMultiplier);
 				amountText.text = makeAmount();
 				amountText.anchor?.set(0.5);
 			(amountText.style as any).fontFamily = "Arial";
@@ -1033,21 +1074,15 @@ export class gameInfo {
 			amountText.visible = true;
 			amountText.anchor.set(0.5);
 			amountText.x = boxWidth / 2;
-			if (GameConstants.IS_MOBILE) {
-				const btnH = boxHeight / 6;
-				const pad = Math.max(8, Math.floor(this.screenHeight * 0.006));
-				amountText.y = boxHeight - btnH - (amountText.height / 2) - pad;
-			} else {
-				amountText.y = volatilityText.y + scalePx(30, this.screenWidth, this.screenHeight);
-			}
+			amountText.y = amountCenterY;
 			
 			boxUpdaters.push(() => { amountText.text = makeAmount(); });
 
 			
 			const button = pool ? pool.acquireGraphics() : new Graphics();
 			pooledGraphics.push(button);
-			button.rect(0, 0, boxWidth, boxHeight / 6).fill({ color: buttonColor, alpha: 1 });
-			button.y = boxHeight - (boxHeight / 6);
+			button.rect(0, 0, boxWidth, buttonHeight).fill({ color: buttonColor, alpha: 1 });
+			button.y = buttonTop;
 			button.cursor = "pointer";
 			button.interactive = true;
 			(button as any).eventMode = 'static';
@@ -1112,11 +1147,11 @@ export class gameInfo {
 
 		const tex0: Texture = this._client.assetsLoader.box0_texture ?? this._client.assetsLoader.box1_texture ?? Texture.WHITE;
 		const box1 = createBox(
-			"BONUS BOOSTER",
-			"Bonus game trigger chance is 4x higher each spin.",
+			t("bonusBuy.booster.title"),
+			t("bonusBuy.booster.description"),
 			tex0,
 			2.5,
-			this._bonusboost ? "DISABLE" : "ACTIVE",
+			this._bonusboost ? t("bonusBuy.booster.disable") : t("bonusBuy.booster.enable"),
 			GameConstants.COLORS.ORANGE_BRIGHT,
 			() => {
 				overlayContainer.destroy({ children: true });
@@ -1139,11 +1174,11 @@ export class gameInfo {
 
 		const tex1: Texture = this._client.assetsLoader.box1_texture ?? this._client.assetsLoader.box0_texture ?? Texture.WHITE;
 		const box2 = createBox(
-			"WOLF BONUS",
-			"10 freespins with more Wolf and Wild symbols!",
+			t("bonusBuy.wolfBonus.title"),
+			t("bonusBuy.wolfBonus.description"),
 			tex1,
 			100,
-			"BUY",
+			t("bonusBuy.buy"),
 			GameConstants.COLORS.GREEN,
 			() => {
 				overlayContainer.destroy({ children: true });
@@ -1155,11 +1190,11 @@ export class gameInfo {
 		);
 		const tex2: Texture = this._client.assetsLoader.box2_texture ?? this._client.assetsLoader.box1_texture ?? this._client.assetsLoader.box0_texture ?? Texture.WHITE;
 		const box3 = createBox(
-			"Dark Moon",
-			"10 Free Spins – Wolf guaranteed each spin!",
+			t("bonusBuy.darkMoon.title"),
+			t("bonusBuy.darkMoon.description"),
 			tex2,
 			200,
-			"BUY",
+			t("bonusBuy.buy"),
 			GameConstants.COLORS.GREEN,
 			() => {
 				overlayContainer.destroy({ children: true });
@@ -1199,7 +1234,7 @@ export class gameInfo {
 			(headerText.style as any).fill = GameConstants.COLORS.WHITE;
 			(headerText.style as any).fontWeight = 'bold';
 			headerText.anchor.set(0.5);
-			headerText.text = 'BONUS BUY';
+			headerText.text = t("hud.bonusBuy");
 			headerText.x = Math.floor(this.screenWidth / 2);
 			const headerH = headerFontSize;
 			headerText.y = Math.floor(safeTop + (headerH / 2));
@@ -1221,7 +1256,7 @@ export class gameInfo {
 			(betTxt.style as any).fill = GameConstants.COLORS.BLACK;
 			(betTxt.style as any).fontWeight = 'bold';
 			betTxt.anchor.set(0.5);
-			betTxt.text = `${GameConstants.currency}${this._client.realAmount.toFixed(2).replace('.', ',')}`;
+			betTxt.text = this.formatMoney(this._client.realAmount);
 			betTxt.x = Math.floor(this.screenWidth / 2);
 			betTxt.y = Math.floor(barY + barH * 0.62);
 			(betTxt as any).zIndex = 210;
@@ -1231,7 +1266,7 @@ export class gameInfo {
 			(betLabel.style as any).fill = GameConstants.COLORS.BLACK;
 			(betLabel.style as any).fontWeight = 'bold';
 			betLabel.anchor.set(0.5);
-			betLabel.text = 'BET';
+			betLabel.text = t("hud.bet");
 			betLabel.x = betTxt.x;
 			betLabel.y = Math.floor(barY + barH * 0.30);
 			(betLabel as any).zIndex = 205;
@@ -1268,7 +1303,7 @@ export class gameInfo {
 							this._client.UpBet();
 						}
 						this.updateBetDisplay();
-						betTxt.text = `${GameConstants.currency}${this._client.realAmount.toFixed(2).replace('.', ',')}`;
+						betTxt.text = this.formatMoney(this._client.realAmount);
 						boxUpdaters.forEach(fn => { try { fn(); } catch {} });
 				} catch {}
 			};
@@ -1456,7 +1491,7 @@ export class gameInfo {
 				(balText.style as any).fontSize = baseWinFont;
 				(balText.style as any).fill = GameConstants.COLORS.WHITE;
 				(balText.style as any).fontWeight = 'bold';
-				balText.text = `${GameConstants.currency}${this._client.reelbalance.toLocaleString('tr-TR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+				balText.text = this.formatMoney(this._client.reelbalance);
 				balText.anchor.set(0.5);
 				balText.x = Math.floor(this.screenWidth / 2);
 				balText.y = Math.floor(bottomBar.y + bottomBarH / 2);
@@ -1483,7 +1518,7 @@ export class gameInfo {
 			bg.x = 0; bg.y = 0;
 			this.setNamed(container, 'autoBg', bg);
 			this.autoSpinText = new Text({
-				text: "AUTO",
+				text: this.getAutoShortLabel(),
 				style: {
 					fontFamily: GameConstants.FONTS.DEFAULT,
 					fontSize: scalePx(22, this.screenWidth, this.screenHeight) * this.MOBILE_UI_SCALE,
@@ -1520,7 +1555,7 @@ export class gameInfo {
 				.fill({alpha: 0.0 })
 				.stroke({ color: GameConstants.COLORS.WHITE, width: 2 });
 			this.autoSpinText = new Text({
-				text: "AUTO",
+				text: this.getAutoShortLabel(),
 				style: {
 					fontFamily: GameConstants.FONTS.DEFAULT,
 					fontSize: scalePx(16, this.screenWidth, this.screenHeight) * this.MOBILE_UI_SCALE * extraBtnScale,
@@ -1556,7 +1591,7 @@ export class gameInfo {
 	}
 
 	private updateBalanceDisplay() {
-		this.balanceText.text = `${GameConstants.currency}${this._client.reelbalance.toLocaleString("tr-TR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+		this.balanceText.text = this.formatMoney(this._client.reelbalance);
 		this.balanceText.style.fill = GameConstants.COLORS.WHITE;
 	}
 
@@ -1564,7 +1599,7 @@ export class gameInfo {
 		if (this.betText) {
 			let bet = this._client.realAmount;
 			if (this._client.currentSpinType == spinType.BONUS_BOOST) bet *= 2.5;
-			this.betText.text = `${GameConstants.currency}${bet.toFixed(2).replace(".", ",")}`;
+			this.betText.text = this.formatMoney(bet);
 		}
 	}
 
@@ -1576,7 +1611,7 @@ export class gameInfo {
 	
 	public setBalance(value: number): void {
 		if (this.balanceText) {
-			this.balanceText.text = `${GameConstants.currency}${value.toLocaleString("tr-TR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+			this.balanceText.text = this.formatMoney(value);
 			(this.balanceText.style as any).fill = GameConstants.COLORS.WHITE as any;
 		}
 	}
@@ -1585,7 +1620,7 @@ export class gameInfo {
 		if (this.betText) {
 			let bet = value;
 			if (this._client.currentSpinType == spinType.BONUS_BOOST) bet *= 2.5;
-			this.betText.text = `${GameConstants.currency}${bet.toFixed(2).replace(".", ",")}`;
+			this.betText.text = this.formatMoney(bet);
 		}
 	}
 
@@ -1614,7 +1649,7 @@ export class gameInfo {
 		}
 		const boxHeight = scalePx(100, this.screenWidth, this.screenHeight);
 		this.freespinLabel = new Text({
-			text: "FREE SPINS",
+			text: t("hud.freeSpins"),
 			style: {
 				fontFamily: GameConstants.FONTS.DEFAULT,
 				fontSize: GameConstants.FONTS.SIZE_SMALL,
@@ -1629,6 +1664,7 @@ export class gameInfo {
 			const twLeftX = this.totalWinContainer ? this.totalWinContainer.x : (this.getBottomBarWidth() - pad);
 			this.freespinLabel.x = Math.max(0, twLeftX - gap);
 			this.freespinLabel.y = boxHeight / 4;
+			this.fitTextToWidth(this.freespinLabel, Math.max(80, this.freespinLabel.x - pad), 12);
 		} else {
 			this.freespinLabel.x = this.boxContainer.width / 2 - 50;
 			this.freespinLabel.y = boxHeight / 4;
@@ -1636,7 +1672,7 @@ export class gameInfo {
 		this.boxContainer.addChild(this.freespinLabel);
 
 		this.freespinText = new Text({
-			text: `${current}/${total}`,
+			text: t("hud.currentFreespins", { current, total }),
 			style: {
 				fontFamily: GameConstants.FONTS.DEFAULT,
 				fontSize: GameConstants.FONTS.SIZE_LARGE,
@@ -1651,6 +1687,7 @@ export class gameInfo {
 			const twLeftX = this.totalWinContainer ? this.totalWinContainer.x : (this.getBottomBarWidth() - pad);
 			this.freespinText.x = Math.max(0, twLeftX - gap);
 			this.freespinText.y = this.freespinLabel.y + 25;
+			this.fitTextToWidth(this.freespinText, Math.max(96, this.freespinText.x - pad), 18);
 		} else {
 			this.freespinText.x = this.freespinLabel.x + 15;
 			this.freespinText.y = this.freespinLabel.y + 25;
@@ -1679,7 +1716,7 @@ export class gameInfo {
 
 	public updateFreespinCounter(current: number, total: number): void {
 		if (this.freespinText) {
-			this.freespinText.text = `${current}/${total}`;
+			this.freespinText.text = t("hud.currentFreespins", { current, total });
 		}
 	}
 
@@ -1805,7 +1842,7 @@ export class gameInfo {
 			(grid as any).interactive = true;
 			(grid as any).eventMode = 'auto';
 
-			const menuItems = ['HOMEPAGE', 'INFO', 'SOUND', 'MUSIC', 'SUPER TURBO', 'TURBO'];
+			const menuItems: MenuItemId[] = ["homepage", "info", "sound", "music", "superTurbo", "turbo"];
 			const cols = 2;
 			const rightPad = Math.max(8, Math.floor(this.screenWidth * 0.02));
 			const leftPad = Math.max(8, Math.floor(this.screenWidth * 0.02));
@@ -1815,7 +1852,7 @@ export class gameInfo {
 			const tileH = Math.max(44, Math.floor(this.screenHeight * 0.075));
 			const infoY = (this.infoButton as any)?.y ?? this.screenHeight * 0.9; 
 
-			menuItems.forEach((label, idx) => {
+			menuItems.forEach((menuItemId, idx) => {
 				const row = Math.floor(idx / cols);
 				const col = idx % cols; 
 				const rightX = this.screenWidth - rightPad - tileW;
@@ -1823,7 +1860,7 @@ export class gameInfo {
 				const x = col === 1 ? rightX : leftX;
 				const y = infoY - (row + 1) * (tileH + gapY);
 				const tile = pool ? pool.acquireContainer() : new Container();
-				(tile as any).label = label;
+				(tile as any).label = menuItemId;
 				tile.sortableChildren = false;
 				tile.x = Math.max(leftPad, x);
 				tile.y = Math.max(8, y);
@@ -1835,10 +1872,10 @@ export class gameInfo {
 				(bg as any).zIndex = 0;
 				let t: Text;
 				if (pool) t = pool.acquireText(); else t = new Text({ text: '', style: {} } as any);
-				t.text = label;
+				t.text = this.getMenuLabel(menuItemId);
 				(t.style as any).fontFamily = 'BEBAS NEUE';
 				(t.style as any).fontSize = Math.max(22, Math.floor(tileH * 0.45));
-				(t.style as any).fill = this.getMenuItemColor(label) as any;
+				(t.style as any).fill = this.getMenuItemColor(menuItemId) as any;
 				(t.style as any).fontWeight = 'bold';
 				(t.style as any).align = 'center';
 				t.anchor?.set?.(0.5);
@@ -1859,7 +1896,7 @@ export class gameInfo {
 				tile.on('pointerup', (e: any) => { 
 					e.stopPropagation?.(); 
 					try { bg.clear(); bg.roundRect(0,0,tileW,tileH,0).fill({ color: 0x000000, alpha: 0.9 }).stroke({ color: 0xffffff, width: 2 }); } catch {}
-					this.handleMenuButtonClick(label); 
+					this.handleMenuButtonClick(menuItemId); 
 				});
 				tile.on('pointerupoutside', (e: any) => { 
 					e.stopPropagation?.(); 
@@ -1889,7 +1926,7 @@ export class gameInfo {
 		const buttonHeight = isMobile ? 90 : 45; 
 		const buttonSpacing = isMobile ? 14 : 7; 
 		const verticalPadding = isMobile ? 20 : 10; 
-		const menuItems = ['HOMEPAGE', 'INFO', 'SOUND', 'MUSIC', 'SUPER TURBO', 'TURBO'];
+		const menuItems: MenuItemId[] = ["homepage", "info", "sound", "music", "superTurbo", "turbo"];
 		const menuHeight = verticalPadding + (menuItems.length * (buttonHeight + buttonSpacing)) - buttonSpacing + verticalPadding;
 
 		const menuBg: Graphics = pool ? pool.acquireGraphics() : new Graphics();
@@ -1917,10 +1954,10 @@ export class gameInfo {
 		
 	}
 
-	private createMenuButton(text: string, index: number, buttonHeight: number, buttonSpacing: number, menuWidth: number, pool?: ObjectPool): Container {
+	private createMenuButton(menuItemId: MenuItemId, index: number, buttonHeight: number, buttonSpacing: number, menuWidth: number, pool?: ObjectPool): Container {
 		const button = new Container();
 		
-		(button as any).label = text;
+		(button as any).label = menuItemId;
 		button.y = 10 + (index * (buttonHeight + buttonSpacing));
 		button.x = 10;
 
@@ -1929,11 +1966,11 @@ export class gameInfo {
 		   let buttonText: Text;
 		   if (pool) {
 			   buttonText = pool.acquireText();
-			   buttonText.text = text;
+			   buttonText.text = this.getMenuLabel(menuItemId);
 			   
 			   buttonText.style.fontFamily = 'BEBAS NEUE';
 			   buttonText.style.fontSize = (GameConstants.IS_MOBILE ? 50 : 25) as any; 
-			   buttonText.style.fill = this.getMenuItemColor(text) as any;
+			   buttonText.style.fill = this.getMenuItemColor(menuItemId) as any;
 			   (buttonText.style as any).fontWeight = 'bold';
 			   buttonText.style.align = 'center' as any;
 			   
@@ -1941,10 +1978,10 @@ export class gameInfo {
 				   buttonText.anchor.set(0, 0.5);
 			   }
 		   } else {
-			   buttonText = new Text(text, {
+			   buttonText = new Text(this.getMenuLabel(menuItemId), {
 				   fontFamily: 'BEBAS NEUE',
 				   fontSize: GameConstants.IS_MOBILE ? 50 : 25,
-				   fill: this.getMenuItemColor(text), 
+				   fill: this.getMenuItemColor(menuItemId), 
 				   fontWeight: 'bold',
 				   align: 'center'
 			   });
@@ -1955,7 +1992,7 @@ export class gameInfo {
 
 		button.addChild(buttonText);
 		
-		(buttonText as any).label = text;
+		(buttonText as any).label = menuItemId;
 
 		
 		const buttonWidth = menuWidth - 20; 
@@ -1971,42 +2008,42 @@ export class gameInfo {
 		});
 
 		button.on('pointerout', () => {
-			buttonText.style.fill = this.getMenuItemColor(text); 
+			buttonText.style.fill = this.getMenuItemColor(menuItemId); 
 		});
 
 		
 		button.on('pointerdown', (e: any) => {
 			e?.stopPropagation?.();
-			this.handleMenuButtonClick(text);
+			this.handleMenuButtonClick(menuItemId);
 		});
 
 		return button;
 	}
 
-	private handleMenuButtonClick(buttonText: string): void {
-		switch (buttonText) {
-			case 'HOMEPAGE':
+	private handleMenuButtonClick(menuItemId: MenuItemId): void {
+		switch (menuItemId) {
+			case "homepage":
 				break;
-			case 'INFO':
+			case "info":
 				break;
-			case 'SOUND':
+			case "sound":
 				this._gameSound = !this._gameSound;
 				this.updateAudioStates().catch(console.warn);
 				this.updateMenuDisplay();
 				return;
-			case 'MUSIC':
+			case "music":
 				this._gameMusic = !this._gameMusic;
 				this.updateAudioStates().catch(console.warn);
 				this.updateMenuDisplay();
 				return;
-			case 'SUPER TURBO':
+			case "superTurbo":
 				if (this._client.turboLevel == 2)
 					this._client.setTurboLevel(0);
 				else
 					this._client.setTurboLevel(2);
 				this.updateMenuDisplay();
 				return;
-			case 'TURBO':
+			case "turbo":
 				this._client.cycleTurboLevel();
 				this.updateMenuDisplay();
 				return;
@@ -2049,48 +2086,49 @@ export class gameInfo {
 	private updateMenuDisplay(): void {
 		if (!this.menuContainer) return;
 		
-		const findBtn = (label: string): Container | undefined => {
-			return this.menuContainer!.children.find((c: any) => (c as any).label === label) as any;
+		const findBtn = (menuItemId: MenuItemId): Container | undefined => {
+			return this.menuContainer!.children.find((c: any) => (c as any).label === menuItemId) as any;
 		};
-		const setFill = (label: string) => {
-			const btn = findBtn(label);
+		const setFill = (menuItemId: MenuItemId) => {
+			const btn = findBtn(menuItemId);
 			if (!btn) return;
 			
 			const txt = (btn.children?.find?.((ch: any) => ch instanceof Text) as any) as Text;
 			if (!txt) return;
 			
 			(txt as any).style = (txt as any).style || {};
-			(txt.style as any).fill = this.getMenuItemColor(label) as any;
+			(txt.style as any).fill = this.getMenuItemColor(menuItemId) as any;
+			txt.text = this.getMenuLabel(menuItemId);
 		};
 		
-		const turboBtn = findBtn('TURBO');
+		const turboBtn = findBtn("turbo");
 		if (turboBtn) {
 			const turboText = (turboBtn.children?.find?.((ch: any) => ch instanceof Text) as any) as Text;
 			if (turboText) {
 				(turboText as any).style = (turboText as any).style || {};
-				(turboText.style as any).fill = this.getMenuItemColor('TURBO') as any;
-				turboText.text = 'TURBO';
+				(turboText.style as any).fill = this.getMenuItemColor("turbo") as any;
+				turboText.text = this.getMenuLabel("turbo");
 			}
 		}
-		setFill('SUPER TURBO');
-		setFill('SOUND');
-		setFill('MUSIC');
+		setFill("superTurbo");
+		setFill("sound");
+		setFill("music");
 	}
 
-	private getMenuItemColor(text: string): number {
+	private getMenuItemColor(menuItemId: MenuItemId): number {
 		const turboLevel = this._client.turboLevel;
-		if (text === 'TURBO') {
+		if (menuItemId === "turbo") {
 			if (turboLevel === 0) return 0xaaaaaa; 
 			if (turboLevel === 1) return 0xFF6B35; 
 			if (turboLevel === 2) return 0xFFD700; 
 		}
-		if (text === 'SUPER TURBO') {
+		if (menuItemId === "superTurbo") {
 			return turboLevel === 2 ? 0xFFD700 : 0xaaaaaa;
 		}
-		if (text === 'SOUND') {
+		if (menuItemId === "sound") {
 			return this._gameSound ? 0xFFFFFF : 0xaaaaaa;
 		}
-		if (text === 'MUSIC') {
+		if (menuItemId === "music") {
 			return this._gameMusic ? 0xFFFFFF : 0xaaaaaa;
 		}
 		return 0xaaaaaa; 
@@ -2277,7 +2315,7 @@ export class gameInfo {
 		const boxHeight = scalePx(100, this.screenWidth, this.screenHeight);
 		const remaining = total - current + 1;
 		this.freespinText = new Text({
-			text: `${remaining} SPINS`,
+			text: this.getSpinsRemainingLabel(remaining),
 			style: {
 				fontFamily: GameConstants.FONTS.DEFAULT,
 				fontSize: scalePx(36, this.screenWidth, this.screenHeight),
@@ -2293,6 +2331,7 @@ export class gameInfo {
 			const gap = Math.max(8, Math.floor(this.screenWidth * 0.02));
 			const twLeftX = this.totalWinContainer ? this.totalWinContainer.x : (this.getBottomBarWidth() - pad);
 			this.freespinText.x = Math.max(0, twLeftX - gap);
+			this.fitTextToWidth(this.freespinText, Math.max(96, this.freespinText.x - pad), 18);
 		} else {
 			this.freespinText.anchor.set(0.5);
 			this.freespinText.x = this.boxContainer.width / 2;
@@ -2304,7 +2343,7 @@ export class gameInfo {
 	public updateFreespinMode(current: number, total: number): void {
 		if (this.freespinText) {
 			const remaining = total - current;
-			this.freespinText.text = `${remaining} SPINS`;
+			this.freespinText.text = this.getSpinsRemainingLabel(remaining);
 			
 			if (GameConstants.IS_MOBILE) {
 				const pad = Math.max(10, Math.floor(this.screenWidth * 0.03));
@@ -2312,6 +2351,7 @@ export class gameInfo {
 				const twLeftX = this.totalWinContainer ? this.totalWinContainer.x : (this.getBottomBarWidth() - pad);
 				(this.freespinText as any).anchor?.set?.(1, 0.5);
 				this.freespinText.x = Math.max(0, twLeftX - gap);
+				this.fitTextToWidth(this.freespinText, Math.max(96, this.freespinText.x - pad), 18);
 			}
 		}
 	}
@@ -2385,7 +2425,7 @@ export class gameInfo {
 				this.autoSpinText.style.fontSize = scalePx(px, this.screenWidth, this.screenHeight) * this.MOBILE_UI_SCALE;
 			}
 		} else {
-			this.autoSpinText.text = "AUTO";
+			this.autoSpinText.text = this.getAutoShortLabel();
 			this.autoSpinText.style.fill = GameConstants.COLORS.WHITE;
 			
 			if (GameConstants.IS_MOBILE) {
@@ -2493,7 +2533,7 @@ export class gameInfo {
 		if (txt) {
 			txt.style.fill = GameConstants.COLORS.ORANGE_BRIGHT;
 			
-			txt.text = 'DISABLE';
+			txt.text = t("bonusBuy.booster.disable");
 			
 			const baseSize = (txt.style.fontSize as number) || 24;
 			(txt.style as any).fontSize = Math.floor(baseSize * 0.85);
@@ -2506,7 +2546,7 @@ export class gameInfo {
 		if (txt) {
 			txt.style.fill = GameConstants.COLORS.WHITE;
 			
-			txt.text = 'BONUS';
+			txt.text = t("hud.bonus");
 			
 			const target = GameConstants.IS_MOBILE
 				? scalePx(22, this.screenWidth, this.screenHeight) * this.MOBILE_UI_SCALE
@@ -2520,7 +2560,7 @@ export class gameInfo {
 			this.betText.style.fill = GameConstants.COLORS.ORANGE_BRIGHT;
 			const currentBet = this._client.realAmount;
 			const boostedBet = currentBet * 2.5;
-			this.betText.text = `${GameConstants.currency}${boostedBet.toFixed(2).replace(".", ",")}`;
+			this.betText.text = this.formatMoney(boostedBet);
 		}
 	}
 
@@ -2528,7 +2568,7 @@ export class gameInfo {
 		if (this.betText) {
 			this.betText.style.fill = GameConstants.COLORS.WHITE;
 			const currentBet = this._client.realAmount;
-			this.betText.text = `${GameConstants.currency}${currentBet.toFixed(2).replace(".", ",")}`;
+			this.betText.text = this.formatMoney(currentBet);
 		}
 	}
 
@@ -2590,7 +2630,7 @@ export class gameInfo {
 				(bg as any).zIndex = 0;
 				let t: Text;
 				if (pool) t = pool.acquireText(); else t = new Text({ text: '', style: {} } as any);
-				t.text = `${count} SPINS`;
+				t.text = this.getSpinsRemainingLabel(count);
 				(t.style as any).fontFamily = 'BEBAS NEUE';
 				(t.style as any).fontSize = Math.max(22, Math.floor(tileH * 0.45));
 				(t.style as any).fill = 0xffffff as any;
@@ -2650,7 +2690,7 @@ export class gameInfo {
 			itemContainer.cursor = 'pointer';
 			itemContainer.hitArea = new Rectangle(5, 0, menuWidth - 10, menuItemHeight - 5);
 			const itemText = pool ? pool.acquireText() : new Text({ text: '', style: {}} as any);
-			itemText.text = `${count} SPINS`; (itemText.style as any).fontFamily = GameConstants.FONTS.DEFAULT;
+			itemText.text = this.getSpinsRemainingLabel(count); (itemText.style as any).fontFamily = GameConstants.FONTS.DEFAULT;
 			(itemText.style as any).fontSize = scalePx(16, this.screenWidth, this.screenHeight) * mScale; (itemText.style as any).fill = GameConstants.COLORS.WHITE; (itemText.style as any).fontWeight = 'bold'; (itemText.style as any).align = 'center';
 			itemText.anchor.set(0.5); itemText.x = menuWidth / 2; itemText.y = menuItemHeight / 2;
 			itemContainer.addChild(itemBg);
