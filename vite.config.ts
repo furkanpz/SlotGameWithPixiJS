@@ -39,7 +39,6 @@ export default defineConfig(({ mode }) => {
       target: "esnext",
     },
     optimizeDeps: {
-      exclude: ["pixi.js"],
       force: true,
       esbuildOptions: {
         target: "esnext",
