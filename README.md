@@ -2,8 +2,6 @@
 
 Lair of Riches is a 5x5 PixiJS slot prototype prepared for a local exhibition setup. The repository contains the frontend game client, the local backend used by the demo math engine, and a local exhibition workflow that starts both services together.
 
-**[Play the Demo](https://furkanpz.github.io/lairofriches/)**
-
 ## Gameplay Showcase
 
 | Stage | Preview |
